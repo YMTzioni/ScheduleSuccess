@@ -16,11 +16,21 @@ npm run dev
 
 ## פריסה (GitHub Pages)
 
-האתר זמין בכתובת: **https://ymtzioni.github.io/ScheduleSuccess/**
+האתר: **https://ymtzioni.github.io/ScheduleSuccess/**
 
-בכל push לענף `main` מתבצע build ופריסה אוטומטית.
+בכל push ל-`main` נבנה הפרויקט ויפורסם אוטומטית לענף `gh-pages`.
 
-ב-GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**
+### הגדרה חד-פעמית ב-GitHub
+
+**Settings → Pages → Build and deployment**
+
+| שדה | ערך |
+|-----|-----|
+| Source | **Deploy from a branch** |
+| Branch | **gh-pages** |
+| Folder | **/ (root)** |
+
+> חשוב: אל תבחר `main` — שם נמצא קוד המקור ולא האתר המבונה.
 
 ```bash
 # בדיקת build מקומי כמו ב-GitHub Pages
