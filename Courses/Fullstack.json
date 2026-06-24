@@ -1,0 +1,264 @@
+{
+  "exportedAt": "2026-06-24T09:23:42.708Z",
+  "courses": [
+    {
+      "lessons": [
+        "Full Stack Intro",
+        "התקנת סביבת עבודה"
+      ],
+      "title": "1. Intro Full Stack"
+    },
+    {
+      "lessons": [
+        "HTML Structure",
+        "HTML Basic Tags 1",
+        "HTML Basic Tags 2",
+        "HTML Basic Tags 3",
+        "HTML Header _ Footer 1",
+        "HTML Header _ Footer 2",
+        "exercise1 basic tags",
+        "Unicode&fonts 1",
+        "Unicode&fonts 2",
+        "Html Advanced tags-exercise 2",
+        "Table _ List 1",
+        "Table _ List 2",
+        "Class Exercise Solution - Tables and Lists",
+        "Input User 1",
+        "Input User 2",
+        "Block&Inline element & div&Span tag",
+        "Exercise Form",
+        "Birthday gift card"
+      ],
+      "title": "2. HTML"
+    },
+    {
+      "lessons": [
+        "CSS Intro",
+        "CSS Fonts",
+        "CSS Text&Color&BackGround",
+        "Selectors",
+        "Selectors hover",
+        "Borders CSS",
+        "Margin&Padding",
+        "The box Model",
+        "Class Exercise",
+        "CSS Unit",
+        "Float&Aligment",
+        "Span&div",
+        "Div&Span-Exercise",
+        "button box shadow",
+        "Display CSS",
+        "Position&Z-index",
+        "Exersice-Position&Z-index",
+        "Float&clear",
+        "Calculator CSS",
+        "Introduction RWD",
+        "Media Queries",
+        "Media Queries Exersice",
+        "Flag project",
+        "Web Design project",
+        "Flex-Box",
+        "Flex-Box Exerisce",
+        "Multi Html page",
+        "Pricing Table",
+        "CSS Grid introduction",
+        "CSS grid",
+        "Class Exersice",
+        "Introduction Bootstrap",
+        "BootsStrap-part1",
+        "BoostStrap- Spacing&Sizing",
+        "Border BootsTrap",
+        "Components&Button",
+        "Class Exrsice -Navbar",
+        "12 Col System",
+        "Inputs&forms",
+        "Table&Pagintion",
+        "Class Exrsice table bootsstrap",
+        "CSS Advanced - Animation",
+        "Web Agency 1",
+        "Web Agency 2",
+        "Web Agency 3"
+      ],
+      "title": "3.CSS"
+    },
+    {
+      "lessons": [
+        "JavaScript Introduction 1",
+        "JavaScript Introduction 2",
+        "JavaScript-Variable 1",
+        "JavaScript-Variable 2",
+        "Exersice Variable",
+        "Operators",
+        "Exersice Var&operators",
+        "Function 1",
+        "Function 2",
+        "IF&Else&Switch&Case 1",
+        "IF&Else&Switch&Case 2",
+        "IF&Else&Switch&Case 3",
+        "Resturant",
+        "Array",
+        "Array Exresice",
+        "Object",
+        "JavaScript For Loops",
+        "Exersice loops & object",
+        "Date Object",
+        "Math",
+        "String",
+        "Exersice str",
+        "Errror Handling",
+        "ERROR Handling + Summary",
+        "Calc finish",
+        "JS Exc"
+      ],
+      "title": "4. JavaScript"
+    },
+    {
+      "lessons": [
+        "5. DOM",
+        "DOM-part2",
+        "GuessGame",
+        "Card_Memory game"
+      ],
+      "title": "5. DOM"
+    },
+    {
+      "lessons": [
+        "Ajax- Part 1",
+        "Ajax- Part 2",
+        "Ajax- Part 3"
+      ],
+      "title": "6. AJAX"
+    },
+    {
+      "lessons": [
+        "Git -part 1",
+        "Git&GitHub-part 2",
+        "Example",
+        "Git&GitHub-part 3",
+        "Git Merge"
+      ],
+      "title": "7. GIT"
+    },
+    {
+      "lessons": [
+        "JQery",
+        "TODO_APP 1",
+        "TODO_APP 2",
+        "Jquery-part 2"
+      ],
+      "title": "8. JQURY"
+    },
+    {
+      "lessons": [
+        "Java Introdunction",
+        "Print_Command&Variable 1",
+        "Print_Command&Variable 2",
+        "Casting Java",
+        "Operators",
+        "Operators part 2",
+        "Class Exercise Primitive Variables",
+        "Java - Exercise -Operators & Primitive Varia",
+        "Java - if else statment & operatorl logic",
+        "Java -Exercise-if else statments",
+        "Switch_Statement",
+        "final Keyword 1",
+        "User Input",
+        "Java-Exercise -User Input 1",
+        "Java-Exercise -User Input 2",
+        "Introduction String",
+        "String_method",
+        "Math Library",
+        "Boolean String",
+        "Java- Date&time",
+        "Java Exersice",
+        "Java-Exercise -summary",
+        "Array_introduction",
+        "Array method",
+        "java-array-Exersice",
+        "JAVA For Loops",
+        "while loops",
+        "DO while",
+        "Loop Through an Array and Declaration of an array",
+        "For each",
+        "java-class Exercise-loops",
+        "introduction to Exrcise",
+        "java-Exercise Summary-part 1",
+        "java-Exercise Summary-part 2",
+        "java-Exercise Summary-part2 A",
+        "java-Exercise Summary-part2 B",
+        "Java break And continue",
+        "array method",
+        "Method 1",
+        "Method 2",
+        "function inside function 1",
+        "java-method Exercise 1",
+        "Throw Exception",
+        "Method overloading",
+        "scope method",
+        "Recursion",
+        "Recursion Exercise",
+        "Recusrion Exercise part 2",
+        "Exceptions",
+        "Exercise-Error Handling (Try & Catch)",
+        "JAVA Class Exersice"
+      ],
+      "title": "9. JAVA"
+    },
+    {
+      "lessons": [
+        "OOP Introduction",
+        "Class Exerscie Pizzeria",
+        "Getters&Setters",
+        "By value&by referance",
+        "OOP_inherit",
+        "Abstact&InterFace",
+        "Java-Collection&Generic",
+        "Threading",
+        "HashTable&Map&Lambada",
+        "polimorfizem"
+      ],
+      "title": "10. OOP"
+    },
+    {
+      "lessons": [
+        "SpringBoot- Part 1",
+        "SpringBoot - Part 2",
+        "SpringBoot - Part 3",
+        "SpringBoot - Part 4",
+        "SpringBoot - Part 5",
+        "SpringBoot - Part 6",
+        "SpringBoot - Part 7",
+        "SpringBooy - Part 8"
+      ],
+      "title": "11.SpringBoot"
+    },
+    {
+      "lessons": [
+        "React-part 1",
+        "React-part 2 A",
+        "React-part 2 B",
+        "ImageGallery",
+        "React - part 4"
+      ],
+      "title": "12. React"
+    },
+    {
+      "lessons": [
+        "SQL Introduction",
+        "SQL Class Exersice",
+        "ERD",
+        "ERD Exersice",
+        "SQL-part 2",
+        "SQL-CRUD",
+        "SQL-entity&more statment",
+        "תירגולים - Full Stack"
+      ],
+      "title": "13. SQL"
+    }
+  ],
+  "debug": {
+    "discoveredLinks": 13,
+    "visited": 13,
+    "skippedNoLessons": 0
+  }
+}

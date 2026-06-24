@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lessons Lister</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Lessons Lister</h1>
+      <p class="hint">
+        פתח את דף הקורסים ולחץ על "סרוק עכשיו". התוסף יעבור קורס-קורס ויחלץ את רשימת
+        השיעורים.
+      </p>
+
+      <button id="scanBtn" type="button">סרוק עכשיו</button>
+      <p id="status" class="status">מוכן לסריקה</p>
+
+      <textarea
+        id="output"
+        readonly
+        placeholder="כאן תופיע רשימת השיעורים..."
+      ></textarea>
+
+      <button id="copyBtn" type="button" class="secondary">העתק רשימה</button>
+      <button id="downloadJsonBtn" type="button" class="secondary">הורד JSON</button>
+    </main>
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>

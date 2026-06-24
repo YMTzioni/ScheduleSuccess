@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Lessons Lister",
+  "description": "סורק קורסים ומייצר רשימת שיעורים מסוננת.",
+  "version": "0.1.1",
+  "permissions": ["tabs", "scripting"],
+  "host_permissions": ["https://login.successcollege.co.il/*"],
+  "action": {
+    "default_title": "Lessons Lister",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}
