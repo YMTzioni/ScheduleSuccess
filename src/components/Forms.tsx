@@ -1,15 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { TRACKS } from '../data/tracks';
-import type { EndDateMode, TimeSlot } from '../types';
+import type { EndDateMode, ScheduleTemplateId, TimeSlot } from '../types';
 import { DAY_NAMES } from '../types';
 import {
+  addHoursToTime,
   buildTimeSlotsFromDistribution,
   getDistributionOptions,
   getDistributionSummary,
   getPeriodStats,
   type DistributionOption,
 } from '../utils/distributionPlanner';
+import { getLessonCountForSlot } from '../utils/scheduleGenerator';
 import type { ScheduleFitStatus } from '../utils/scheduleRecommendations';
+import {
+  getScheduleTemplate,
+  SCHEDULE_TEMPLATES,
+  slotMeetsMinHours,
+} from '../utils/scheduleTemplates';
 
 interface StudentFormProps {
   fullName: string;
@@ -176,16 +183,19 @@ interface ScheduleBuilderProps {
   manualEndDate: string;
   calculatedEndDate: string;
   trackIds: string[];
+  scheduleTemplateId: ScheduleTemplateId;
   timeSlots: TimeSlot[];
   scheduleFit: ScheduleFitStatus | null;
   onStartDateChange: (v: string) => void;
   onEndDateModeChange: (mode: EndDateMode) => void;
   onManualEndDateChange: (v: string) => void;
+  onScheduleTemplateIdChange: (id: ScheduleTemplateId) => void;
   onTimeSlotsChange: (slots: TimeSlot[]) => void;
 }
 
 const DEFAULT_START = '09:00';
 const DEFAULT_END = '12:00';
+const MICHAEL_DEFAULT_END = '17:00';
 const STUDY_DAYS = [0, 1, 2, 3, 4] as const;
 
 function formatDateHeDisplay(dateStr: string): string {
@@ -200,16 +210,22 @@ export function ScheduleBuilder({
   manualEndDate,
   calculatedEndDate,
   trackIds,
+  scheduleTemplateId,
   timeSlots,
   scheduleFit,
   onStartDateChange,
   onEndDateModeChange,
   onManualEndDateChange,
+  onScheduleTemplateIdChange,
   onTimeSlotsChange,
 }: ScheduleBuilderProps) {
+  const activeTemplate = getScheduleTemplate(scheduleTemplateId);
+  const isMichaelTemplate = scheduleTemplateId === 'michael';
+  const minHoursPerSession = activeTemplate.minHoursPerSession;
+
   const [newDay, setNewDay] = useState(0);
   const [newStart, setNewStart] = useState(DEFAULT_START);
-  const [newEnd, setNewEnd] = useState(DEFAULT_END);
+  const [newEnd, setNewEnd] = useState(isMichaelTemplate ? MICHAEL_DEFAULT_END : DEFAULT_END);
 
   const [sessionsPerWeek, setSessionsPerWeek] = useState(2);
   const [hoursPerSession, setHoursPerSession] = useState(4);
@@ -233,31 +249,72 @@ export function ScheduleBuilder({
   }, [periodStats, distributionOptions]);
 
   const showManualPlanner =
-    endDateMode === 'manual' && startDate && manualEndDate && trackIds.length > 0 && periodStats;
+    !isMichaelTemplate &&
+    endDateMode === 'manual' &&
+    startDate &&
+    manualEndDate &&
+    trackIds.length > 0 &&
+    periodStats;
 
   useEffect(() => {
+    if (isMichaelTemplate) return;
     if (endDateMode === 'auto') {
       setDistributionApplied(false);
       setSelectedOptionId(null);
     }
-  }, [endDateMode]);
+  }, [endDateMode, isMichaelTemplate]);
 
   useEffect(() => {
+    if (isMichaelTemplate && startDate) {
+      const template = getScheduleTemplate('michael');
+      onEndDateModeChange('auto');
+      onManualEndDateChange('');
+      setSessionsPerWeek(template.sessionsPerWeek);
+      setHoursPerSession(template.hoursPerSession);
+      setNewEnd(MICHAEL_DEFAULT_END);
+      return;
+    }
+
     setDistributionApplied(false);
     setSelectedOptionId(null);
     onTimeSlotsChange([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset slots when period inputs change
-  }, [manualEndDate, startDate, trackIds.join(',')]);
+  }, [isMichaelTemplate, startDate, trackIds.join(',')]);
 
   useEffect(() => {
-    if (distributionOptions.length > 0) {
-      const best = distributionOptions[0];
-      setSelectedOptionId(best.id);
-      setSessionsPerWeek(best.sessionsPerWeek);
-      setHoursPerSession(best.hoursPerSession);
-      setSelectedDays(best.recommendedDays);
+    if (!isMichaelTemplate || !startDate) return;
+    if (selectedDays.length === activeTemplate.sessionsPerWeek) {
+      applyMichaelDays(selectedDays);
+    } else {
+      onTimeSlotsChange([]);
+      setDistributionApplied(false);
     }
-  }, [distributionOptions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- apply michael slots when days change
+  }, [isMichaelTemplate, startDate, selectedDays.join(',')]);
+
+  useEffect(() => {
+    if (isMichaelTemplate || distributionOptions.length === 0) return;
+    const best = distributionOptions[0];
+    setSelectedOptionId(best.id);
+    setSessionsPerWeek(best.sessionsPerWeek);
+    setHoursPerSession(best.hoursPerSession);
+    setSelectedDays(best.recommendedDays);
+  }, [distributionOptions, isMichaelTemplate]);
+
+  const handleTemplateChange = (id: ScheduleTemplateId) => {
+    onScheduleTemplateIdChange(id);
+    if (id === 'michael') {
+      setSelectedDays([0, 3]);
+    }
+    if (id === 'custom') {
+      setDistributionApplied(false);
+      setSelectedOptionId(null);
+      onTimeSlotsChange([]);
+      onEndDateModeChange('auto');
+      onManualEndDateChange('');
+      setNewEnd(DEFAULT_END);
+    }
+  };
 
   const selectDistributionOption = (option: DistributionOption) => {
     setSelectedOptionId(option.id);
@@ -272,18 +329,34 @@ export function ScheduleBuilder({
       if (prev.includes(day)) {
         return prev.filter((d) => d !== day);
       }
+      if (isMichaelTemplate && prev.length >= activeTemplate.sessionsPerWeek) {
+        return prev;
+      }
       return [...prev, day].sort((a, b) => a - b);
     });
   };
 
+  const applyMichaelDays = (days: number[]) => {
+    if (days.length !== activeTemplate.sessionsPerWeek) return;
+    const slots = buildTimeSlotsFromDistribution(
+      days,
+      activeTemplate.hoursPerSession,
+      DEFAULT_START,
+    );
+    onTimeSlotsChange(slots);
+    setDistributionApplied(true);
+  };
+
   const applyDistribution = () => {
     if (selectedDays.length === 0) return;
+    if (isMichaelTemplate && selectedDays.length !== 2) return;
     const slots = buildTimeSlotsFromDistribution(selectedDays, hoursPerSession, DEFAULT_START);
     onTimeSlotsChange(slots);
     setDistributionApplied(true);
   };
 
   const handleModeChange = (mode: EndDateMode) => {
+    if (isMichaelTemplate) return;
     onEndDateModeChange(mode);
     onTimeSlotsChange([]);
     setDistributionApplied(false);
@@ -291,6 +364,9 @@ export function ScheduleBuilder({
   };
 
   const addSlot = () => {
+    const slot = { dayOfWeek: newDay, startTime: newStart, endTime: newEnd };
+    if (!slotMeetsMinHours(slot, minHoursPerSession)) return;
+
     const exists = timeSlots.some(
       (s) =>
         s.dayOfWeek === newDay &&
@@ -299,22 +375,119 @@ export function ScheduleBuilder({
     );
     if (exists) return;
 
-    onTimeSlotsChange([
-      ...timeSlots,
-      { dayOfWeek: newDay, startTime: newStart, endTime: newEnd },
-    ]);
-    setDistributionApplied(false);
+    if (isMichaelTemplate && timeSlots.length >= 2) return;
+
+    onTimeSlotsChange([...timeSlots, slot]);
+    if (!isMichaelTemplate) {
+      setDistributionApplied(false);
+    }
   };
 
   const removeSlot = (index: number) => {
+    if (isMichaelTemplate) return;
     onTimeSlotsChange(timeSlots.filter((_, i) => i !== index));
     setDistributionApplied(false);
   };
+
+  const handleStartTimeChange = (value: string) => {
+    setNewStart(value);
+    if (isMichaelTemplate) {
+      setNewEnd(addHoursToTime(value, minHoursPerSession));
+    }
+  };
+
+  const handleEndTimeChange = (value: string) => {
+    const minEnd = addHoursToTime(newStart, minHoursPerSession);
+    if (isMichaelTemplate && parseMinutes(value) < parseMinutes(minEnd)) {
+      setNewEnd(minEnd);
+      return;
+    }
+    setNewEnd(value);
+  };
+
+  function parseMinutes(time: string): number {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  }
+
+  const newSlotHours = getLessonCountForSlot(newStart, newEnd);
+  const showSlotBuilder = endDateMode === 'auto' || distributionApplied;
 
   return (
     <section className="card">
       <h2>מערכת שעות לימוד</h2>
 
+      <div className="schedule-template-picker">
+        <h3>תבנית מערכת שעות</h3>
+        <div className="mode-toggle">
+          {SCHEDULE_TEMPLATES.map((template) => (
+            <label
+              key={template.id}
+              className={`mode-option ${scheduleTemplateId === template.id ? 'active' : ''}`}
+            >
+              <input
+                type="radio"
+                name="scheduleTemplate"
+                value={template.id}
+                checked={scheduleTemplateId === template.id}
+                onChange={() => handleTemplateChange(template.id)}
+              />
+              <span className="mode-title">{template.name}</span>
+              <span className="mode-desc">{template.description}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {isMichaelTemplate && startDate && (
+        <div className="recommendation-panel recommendation-ok template-michael-panel">
+          <strong>תבנית מיכאל פעילה</strong>
+          <ul>
+            <li>תאריך סיום מחושב אוטומטית לפי המסלולים</li>
+            {trackIds.length > 1 && (
+              <li>מסלולים לפי סדר — מסלול אחד בכל שבוע, ללא ערבוב</li>
+            )}
+            <li>
+              2 ימי לימוד בשבוע
+              {selectedDays.length === 2
+                ? `: ${selectedDays.map((d) => DAY_NAMES[d]).join(' ו')}`
+                : ' — בחר ימים למטה'}
+            </li>
+            <li>8 שעות לימוד בכל יום (09:00–17:00)</li>
+            {calculatedEndDate && (
+              <li>
+                תאריך סיום משוער: <span dir="ltr">{formatDateHeDisplay(calculatedEndDate)}</span>
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+
+      {isMichaelTemplate && startDate && (
+        <div className="distribution-days michael-days-picker">
+          <h4>ימי לימוד בשבוע (בחר 2)</h4>
+          <div className="day-picker">
+            {STUDY_DAYS.map((day) => (
+              <label
+                key={day}
+                className={`day-chip ${selectedDays.includes(day) ? 'selected' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedDays.includes(day)}
+                  onChange={() => toggleDay(day)}
+                />
+                {DAY_NAMES[day]}
+              </label>
+            ))}
+          </div>
+          {selectedDays.length < 2 && (
+            <p className="slot-min-hours-hint">יש לבחור בדיוק 2 ימי לימוד בשבוע</p>
+          )}
+        </div>
+      )}
+
+      {!isMichaelTemplate && (
       <div className="end-date-mode">
         <h3>תאריך סיום</h3>
         <div className="mode-toggle">
@@ -342,6 +515,7 @@ export function ScheduleBuilder({
           </label>
         </div>
       </div>
+      )}
 
       <div className="form-grid">
         <label>
@@ -353,7 +527,19 @@ export function ScheduleBuilder({
             dir="ltr"
           />
         </label>
-        {endDateMode === 'auto' ? (
+        {isMichaelTemplate ? (
+          <label>
+            תאריך סיום (מחושב)
+            <input
+              type="text"
+              value={formatDateHeDisplay(calculatedEndDate)}
+              readOnly
+              className="readonly-field"
+              dir="ltr"
+              placeholder="יוצג לאחר בחירת מסלולים וימי לימוד"
+            />
+          </label>
+        ) : endDateMode === 'auto' ? (
           <label>
             תאריך סיום (מחושב)
             <input
@@ -451,7 +637,7 @@ export function ScheduleBuilder({
                     setHoursPerSession(Number(e.target.value));
                   }}
                 >
-                  {[2, 3, 4, 5, 6, 7, 8].map((n) => (
+                  {Array.from({ length: 7 }, (_, i) => i + 2).map((n) => (
                     <option key={n} value={n}>
                       {n}
                     </option>
@@ -499,10 +685,17 @@ export function ScheduleBuilder({
         </div>
       )}
 
-      {(endDateMode === 'auto' || distributionApplied) && (
+      {(endDateMode === 'auto' || distributionApplied) && showSlotBuilder && (
         <>
           <div className="slot-builder">
-            <h3>{endDateMode === 'manual' ? 'עדכון ימים ושעות (אופציונלי)' : 'הוספת יום ושעות לימוד'}</h3>
+            <h3>
+              {isMichaelTemplate
+                ? 'ימים ושעות לימוד (תבנית מיכאל)'
+                : endDateMode === 'manual'
+                  ? 'עדכון ימים ושעות (אופציונלי)'
+                  : 'הוספת יום ושעות לימוד'}
+            </h3>
+            {!isMichaelTemplate && (
             <div className="slot-form">
               <label>
                 יום
@@ -519,7 +712,7 @@ export function ScheduleBuilder({
                 <input
                   type="time"
                   value={newStart}
-                  onChange={(e) => setNewStart(e.target.value)}
+                  onChange={(e) => handleStartTimeChange(e.target.value)}
                   dir="ltr"
                 />
               </label>
@@ -528,14 +721,33 @@ export function ScheduleBuilder({
                 <input
                   type="time"
                   value={newEnd}
-                  onChange={(e) => setNewEnd(e.target.value)}
+                  onChange={(e) => handleEndTimeChange(e.target.value)}
+                  min={isMichaelTemplate ? addHoursToTime(newStart, minHoursPerSession) : undefined}
                   dir="ltr"
                 />
               </label>
-              <button type="button" className="btn btn-secondary" onClick={addSlot}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={addSlot}
+                disabled={
+                  isMichaelTemplate &&
+                  (!slotMeetsMinHours(
+                    { dayOfWeek: newDay, startTime: newStart, endTime: newEnd },
+                    minHoursPerSession,
+                  ) ||
+                    timeSlots.length >= 2)
+                }
+              >
                 + הוסף
               </button>
             </div>
+            )}
+            {isMichaelTemplate && newSlotHours < minHoursPerSession && (
+              <p className="slot-min-hours-hint">
+                בתבנית מיכאל נדרשות לפחות {minHoursPerSession} שעות לימוד ביום.
+              </p>
+            )}
           </div>
 
           {timeSlots.length > 0 && (
@@ -551,6 +763,7 @@ export function ScheduleBuilder({
                       type="button"
                       className="btn-remove"
                       onClick={() => removeSlot(i)}
+                      disabled={isMichaelTemplate}
                       aria-label="הסר"
                     >
                       ×
@@ -564,9 +777,11 @@ export function ScheduleBuilder({
       )}
 
       <p className="hint">
-        {endDateMode === 'auto'
-          ? 'המערכת תחשב אוטומטית את תאריך הסיום לפי מספר השיעורים, ימי הלימוד והשעות, תוך דילוג על שבתות וחגים.'
-          : 'במצב ידני: קודם בחר תאריכים וחלוקה, ואז המערכת תבנה את ימי הלימוד עבורך.'}
+        {isMichaelTemplate
+          ? 'תבנית מיכאל: מסלולים לפי סדר (מסלול אחד בכל שבוע), 2 ימים בשבוע, 8 שעות ביום. תאריך הסיום מחושב אוטומטית.'
+          : endDateMode === 'auto'
+            ? 'המערכת תחשב אוטומטית את תאריך הסיום לפי מספר השיעורים, ימי הלימוד והשעות, תוך דילוג על שבתות וחגים.'
+            : 'במצב ידני: קודם בחר תאריכים וחלוקה, ואז המערכת תבנה את ימי הלימוד עבורך.'}
       </p>
     </section>
   );

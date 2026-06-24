@@ -1,7 +1,7 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import type { EndDateMode, TimeSlot } from '../types';
 import { getTotalLessonCount } from '../data/tracks';
-import { getLessonCountForSlot } from './scheduleGenerator';
+import { getLessonCountForSlot, getScheduleQueueItemCount } from './scheduleGenerator';
 
 export interface ScheduleFitStatus {
   status: 'ok' | 'short';
@@ -29,25 +29,30 @@ export function getScheduleFitStatus({
   }
 
   const totalLessons = getTotalLessonCount(trackIds);
-  if (!totalLessons) return null;
+  const totalScheduleItems = getScheduleQueueItemCount(trackIds);
+  if (!totalScheduleItems) return null;
 
   const start = parseISO(startDate);
   const end = parseISO(manualEndDate);
   if (end < start) return null;
 
-  if (assignedLessons >= totalLessons) {
+  if (assignedLessons >= totalScheduleItems) {
     return {
       status: 'ok',
       title: 'הלוז שהוחל מתאים לתקופה',
-      messages: [`שובצו כל ${totalLessons} השיעורים בהצלחה.`],
+      messages: [
+        `שובצו כל ${totalLessons} השיעורים ו-${totalScheduleItems - totalLessons} ימי סיום מסלול (מבחן ותעודות).`,
+      ],
     };
   }
 
+  const milestoneCount = totalScheduleItems - totalLessons;
+
   return {
     status: 'short',
-    title: `שובצו ${assignedLessons} מתוך ${totalLessons} שיעורים`,
+    title: `שובצו ${assignedLessons} מתוך ${totalScheduleItems} מפגשים`,
     messages: [
-      `חסרים עוד ${totalLessons - assignedLessons} שיעורים — נסה חלוקה אחרת או הארך את התקופה.`,
+      `חסרים עוד ${totalScheduleItems - assignedLessons} מפגשים (כולל מבחני סיום וחלוקת תעודות ל-${milestoneCount / 2} מסלולים) — נסה חלוקה אחרת או הארך את התקופה.`,
     ],
   };
 }

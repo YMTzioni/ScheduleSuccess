@@ -5,7 +5,7 @@ import { DocumentPreview } from './components/DocumentPreview';
 import { buildSchedule, countScheduledLessons } from './utils/scheduleGenerator';
 import { getScheduleFitStatus } from './utils/scheduleRecommendations';
 import { getTotalLessonCount } from './data/tracks';
-import type { EndDateMode, TimeSlot } from './types';
+import type { EndDateMode, ScheduleTemplateId, TimeSlot } from './types';
 import logoUrl from './assets/logo.png';
 import './App.css';
 
@@ -17,6 +17,7 @@ function App() {
   const [startDate, setStartDate] = useState('');
   const [endDateMode, setEndDateMode] = useState<EndDateMode>('auto');
   const [manualEndDate, setManualEndDate] = useState('');
+  const [scheduleTemplateId, setScheduleTemplateId] = useState<ScheduleTemplateId>('custom');
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [showDocument, setShowDocument] = useState(false);
 
@@ -142,11 +143,13 @@ function App() {
           manualEndDate={manualEndDate}
           calculatedEndDate={endDate}
           trackIds={trackIds}
+          scheduleTemplateId={scheduleTemplateId}
           timeSlots={timeSlots}
           scheduleFit={scheduleFit}
           onStartDateChange={setStartDate}
           onEndDateModeChange={setEndDateMode}
           onManualEndDateChange={setManualEndDate}
+          onScheduleTemplateIdChange={setScheduleTemplateId}
           onTimeSlotsChange={setTimeSlots}
         />
 

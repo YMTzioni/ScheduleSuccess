@@ -1,5 +1,10 @@
 import type { ScheduledSession } from '../types';
 import { formatDayLetter } from '../types';
+import { CERTIFICATE_TITLE, FINAL_EXAM_TITLE } from '../utils/scheduleGenerator';
+
+function isMilestoneTitle(title: string): boolean {
+  return title === FINAL_EXAM_TITLE || title === CERTIFICATE_TITLE;
+}
 
 interface PrintScheduleTableProps {
   sessions: ScheduledSession[];
@@ -40,8 +45,15 @@ export function PrintScheduleTable({
           </thead>
         )}
         <tbody>
-          {sessions.map((session, i) => (
-            <tr key={`${pageIndex}-${session.date}-${session.startTime}-${i}`}>
+          {sessions.map((session, i) => {
+            const isMilestone =
+              session.lessonItems.length === 1 && isMilestoneTitle(session.lessonItems[0].title);
+
+            return (
+            <tr
+              key={`${pageIndex}-${session.date}-${session.startTime}-${i}`}
+              className={isMilestone ? 'milestone-row' : undefined}
+            >
               <td className="cell-date" dir="ltr">
                 {formatDateShort(session.date)}
               </td>
@@ -62,7 +74,8 @@ export function PrintScheduleTable({
                 )}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

@@ -19,6 +19,8 @@ export interface TimeSlot {
 
 export type EndDateMode = 'auto' | 'manual';
 
+export type ScheduleTemplateId = 'custom' | 'michael';
+
 export interface LessonItem {
   title: string;
   trackName: string;

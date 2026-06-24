@@ -319,6 +319,38 @@ select:focus {
   cursor: default;
 }
 
+.schedule-template-picker {
+  margin-bottom: 1.25rem;
+}
+
+.schedule-template-picker h3 {
+  margin-bottom: 0.65rem;
+  font-size: 0.95rem;
+}
+
+.template-michael-panel {
+  margin-bottom: 1rem;
+}
+
+.slot-min-hours-hint {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #c2410c;
+}
+
+.pdf-page .schedule-print-table tbody tr.milestone-row {
+  background: var(--brand-light);
+  font-weight: 600;
+}
+
+.pdf-page .schedule-print-table tbody tr.milestone-row .lesson-text {
+  color: var(--brand-black);
+}
+
+.michael-days-picker {
+  margin-bottom: 1rem;
+}
+
 .end-date-mode {
   margin-bottom: 1.25rem;
 }
