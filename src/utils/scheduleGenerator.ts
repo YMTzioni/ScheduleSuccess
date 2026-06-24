@@ -1,4 +1,15 @@
-import { addDays, addYears, format, isAfter, isBefore, parseISO } from 'date-fns';
+import {
+  addDays,
+  addMonths,
+  addYears,
+  endOfMonth,
+  format,
+  isAfter,
+  max,
+  min,
+  parseISO,
+  startOfMonth,
+} from 'date-fns';
 import type { EndDateMode, ScheduledSession, TimeSlot } from '../types';
 import { TRACKS, getTotalLessonCount } from '../data/tracks';
 import { getIsraeliHolidays, isStudyDay } from './holidays';
@@ -6,6 +17,7 @@ import { getIsraeliHolidays, isStudyDay } from './holidays';
 export const FINAL_EXAM_TITLE = 'מבחן סיום';
 export const CERTIFICATE_TITLE = 'חלוקת תעודות';
 export const PRACTICE_TITLE = 'תרגול חומר';
+const PRACTICE_SESSIONS_PER_MONTH = 2;
 
 export type ScheduleQueueItem =
   | { type: 'lesson'; title: string; trackName: string }
@@ -203,8 +215,14 @@ function separateLessonAndMilestoneSessions(sessions: ScheduledSession[]): {
   const milestoneSessions: ScheduledSession[] = [];
 
   for (const session of sessions) {
-    if (session.lessonItems.length === 1 && isMilestoneTitle(session.lessonItems[0].title)) {
-      milestoneSessions.push(session);
+    if (
+      session.lessonItems.length === 1 &&
+      (isMilestoneTitle(session.lessonItems[0].title) ||
+        isPracticeTitle(session.lessonItems[0].title))
+    ) {
+      if (isMilestoneTitle(session.lessonItems[0].title)) {
+        milestoneSessions.push(session);
+      }
     } else {
       lessonSessions.push(session);
     }
@@ -223,43 +241,92 @@ function createPracticeSession(slot: MeetingSlot, trackName: string): ScheduledS
   };
 }
 
-function allocateTrackMeetings(
+function seededShuffle<T>(items: T[], seed: string): T[] {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (Math.imul(31, hash) + seed.charCodeAt(i)) | 0;
+  }
+
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    hash = Math.imul(hash ^ (hash >>> 15), hash | 1);
+    hash ^= hash + Math.imul(hash ^ (hash >>> 7), hash | 61);
+    const j = ((hash ^ (hash >>> 14)) >>> 0) % (i + 1);
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+
+  return copy;
+}
+
+function pickRandomPracticeSlots(
+  periodStart: Date,
+  periodEnd: Date,
+  timeSlots: TimeSlot[],
+  holidayMap: ReturnType<typeof getIsraeliHolidays>,
+  usedDates: Set<string>,
+  seed: string,
+): MeetingSlot[] {
+  const picked: MeetingSlot[] = [];
+  let monthCursor = startOfMonth(periodStart);
+
+  while (!isAfter(monthCursor, periodEnd)) {
+    const monthStart = max([monthCursor, periodStart]);
+    const monthEnd = min([endOfMonth(monthCursor), periodEnd]);
+    const monthMeetings = collectValidMeetingSlots(monthStart, monthEnd, timeSlots, holidayMap).filter(
+      (slot) => !usedDates.has(slot.date),
+    );
+    const shuffled = seededShuffle(monthMeetings, `${seed}-${format(monthCursor, 'yyyy-MM')}`);
+
+    for (const slot of shuffled.slice(0, PRACTICE_SESSIONS_PER_MONTH)) {
+      usedDates.add(slot.date);
+      picked.push(slot);
+    }
+
+    monthCursor = addMonths(monthCursor, 1);
+  }
+
+  return picked;
+}
+
+function allocateTrackWithRandomPractice(
   trackSessions: ScheduledSession[],
-  meetingSlots: MeetingSlot[],
+  periodStart: Date,
+  periodEnd: Date,
+  timeSlots: TimeSlot[],
+  holidayMap: ReturnType<typeof getIsraeliHolidays>,
+  seed: string,
 ): ScheduledSession[] {
-  if (meetingSlots.length === 0 || trackSessions.length === 0) return trackSessions;
+  if (trackSessions.length === 0) return [];
 
   const { lessonSessions, milestoneSessions } = separateLessonAndMilestoneSessions(trackSessions);
   const trackName = trackSessions[0].lessonItems[0].trackName;
-  const practiceCount = Math.max(
-    0,
-    meetingSlots.length - lessonSessions.length - milestoneSessions.length,
+  const allMeetings = collectValidMeetingSlots(periodStart, periodEnd, timeSlots, holidayMap);
+  const lessonCount = lessonSessions.length;
+  const milestoneCount = milestoneSessions.length;
+
+  if (allMeetings.length < lessonCount + milestoneCount) {
+    return trackSessions.map((session, index) =>
+      remapSession(session, allMeetings[Math.min(index, allMeetings.length - 1)]),
+    );
+  }
+
+  const lessonSlots = allMeetings.slice(0, lessonCount);
+  const milestoneSlots = allMeetings.slice(allMeetings.length - milestoneCount);
+  const usedDates = new Set([...lessonSlots, ...milestoneSlots].map((slot) => slot.date));
+  const practiceSlots = pickRandomPracticeSlots(
+    periodStart,
+    periodEnd,
+    timeSlots,
+    holidayMap,
+    usedDates,
+    seed,
   );
 
-  if (lessonSessions.length === 0 && milestoneSessions.length === 0) return trackSessions;
-
-  const result: ScheduledSession[] = [];
-  let slotIndex = 0;
-
-  for (const session of lessonSessions) {
-    if (slotIndex >= meetingSlots.length) break;
-    result.push(remapSession(session, meetingSlots[slotIndex]));
-    slotIndex += 1;
-  }
-
-  for (let i = 0; i < practiceCount; i += 1) {
-    if (slotIndex >= meetingSlots.length) break;
-    result.push(createPracticeSession(meetingSlots[slotIndex], trackName));
-    slotIndex += 1;
-  }
-
-  for (const session of milestoneSessions) {
-    if (slotIndex >= meetingSlots.length) break;
-    result.push(remapSession(session, meetingSlots[slotIndex]));
-    slotIndex += 1;
-  }
-
-  return result;
+  return [
+    ...lessonSessions.map((session, index) => remapSession(session, lessonSlots[index])),
+    ...practiceSlots.map((slot) => createPracticeSession(slot, trackName)),
+    ...milestoneSessions.map((session, index) => remapSession(session, milestoneSlots[index])),
+  ].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
 }
 
 function partitionTrackSessions(
@@ -309,30 +376,51 @@ function padSessionsWithPracticeDays(
   const start = parseISO(startDate);
   const minEnd = addYears(start, minimumYears);
   const lastDate = parseISO(sessions[sessions.length - 1].date);
-  if (!isBefore(lastDate, minEnd)) return sessions;
-
-  const holidayMap = getIsraeliHolidays(startDate, format(minEnd, 'yyyy-MM-dd'));
-  const allMeetings = collectValidMeetingSlots(start, minEnd, timeSlots, holidayMap);
-  if (allMeetings.length <= sessions.length) {
-    return sessions.map((session, index) => remapSession(session, allMeetings[index] ?? allMeetings[allMeetings.length - 1]));
-  }
-
+  const periodEnd = isAfter(lastDate, minEnd) ? lastDate : minEnd;
+  const holidayMap = getIsraeliHolidays(startDate, format(periodEnd, 'yyyy-MM-dd'));
   const trackPartitions = partitionTrackSessions(sessions);
 
   if (!enforceSequentialTracks || trackPartitions.length === 1) {
-    return allocateTrackMeetings(sessions, allMeetings);
+    return allocateTrackWithRandomPractice(
+      sessions,
+      start,
+      periodEnd,
+      timeSlots,
+      holidayMap,
+      startDate,
+    );
   }
 
-  const validWeeks = getValidWeekKeys(start, minEnd, timeSlots, holidayMap);
+  const validWeeks = getValidWeekKeys(start, periodEnd, timeSlots, holidayMap);
   const weeksPerTrack = splitWeeksAmongTracks(validWeeks, trackPartitions.length);
 
-  return trackPartitions.flatMap((track, index) => {
-    const weekSet = new Set(weeksPerTrack[index]);
-    const trackMeetings = allMeetings.filter((meeting) =>
-      weekSet.has(getWeekKey(parseISO(meeting.date))),
-    );
-    return allocateTrackMeetings(track.sessions, trackMeetings);
-  });
+  return trackPartitions
+    .flatMap((track, index) => {
+      const trackWeeks = weeksPerTrack[index];
+      if (trackWeeks.length === 0) {
+        return allocateTrackWithRandomPractice(
+          track.sessions,
+          start,
+          periodEnd,
+          timeSlots,
+          holidayMap,
+          `${startDate}-${track.trackName}`,
+        );
+      }
+
+      const trackStart = parseISO(trackWeeks[0]);
+      const trackEnd = min([addDays(parseISO(trackWeeks[trackWeeks.length - 1]), 6), periodEnd]);
+
+      return allocateTrackWithRandomPractice(
+        track.sessions,
+        trackStart,
+        trackEnd,
+        timeSlots,
+        holidayMap,
+        `${startDate}-${track.trackName}`,
+      );
+    })
+    .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
 }
 
 export function getMinimumPeriodEndDate(startDate: string, years: number): string {
