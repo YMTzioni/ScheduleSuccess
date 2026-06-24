@@ -1,4 +1,4 @@
-import { addDays, addYears, format, isAfter, parseISO } from 'date-fns';
+import { addDays, addYears, differenceInCalendarDays, format, isAfter, isBefore, parseISO } from 'date-fns';
 import type { EndDateMode, ScheduledSession, TimeSlot } from '../types';
 import { TRACKS, getTotalLessonCount } from '../data/tracks';
 import { getIsraeliHolidays, isStudyDay } from './holidays';
@@ -96,6 +96,7 @@ export interface BuildScheduleParams {
   timeSlots: TimeSlot[];
   endDateMode: EndDateMode;
   manualEndDate?: string;
+  minimumPeriodYears?: number;
 }
 
 export interface ScheduleResult {
@@ -119,6 +120,156 @@ export function getLessonCountForSlot(startTime: string, endTime: string): numbe
   if (duration <= 0) return 1;
   const count = Math.floor(duration / 60);
   return count > 0 ? count : 1;
+}
+
+function groupSessionsByWeek(sessions: ScheduledSession[]): ScheduledSession[][] {
+  const groups = new Map<string, ScheduledSession[]>();
+
+  for (const session of sessions) {
+    const weekKey = getWeekKey(parseISO(session.date));
+    const weekSessions = groups.get(weekKey);
+    if (weekSessions) {
+      weekSessions.push(session);
+    } else {
+      groups.set(weekKey, [session]);
+    }
+  }
+
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, weekSessions]) => weekSessions);
+}
+
+function getValidWeekKeys(
+  start: Date,
+  end: Date,
+  timeSlots: TimeSlot[],
+  holidayMap: ReturnType<typeof getIsraeliHolidays>,
+): string[] {
+  const weekKeys = new Set<string>();
+  let current = start;
+
+  while (!isAfter(current, end)) {
+    const daySlots = timeSlots.filter((s) => s.dayOfWeek === current.getDay());
+    if (daySlots.length > 0 && isStudyDay(current, holidayMap).allowed) {
+      weekKeys.add(getWeekKey(current));
+    }
+    current = addDays(current, 1);
+  }
+
+  return Array.from(weekKeys).sort();
+}
+
+function collectValidMeetingDates(
+  start: Date,
+  end: Date,
+  timeSlots: TimeSlot[],
+  holidayMap: ReturnType<typeof getIsraeliHolidays>,
+): { date: string; dayOfWeek: number }[] {
+  const meetings: { date: string; dayOfWeek: number }[] = [];
+  let current = start;
+
+  while (!isAfter(current, end)) {
+    const daySlots = timeSlots.filter((s) => s.dayOfWeek === current.getDay());
+    if (daySlots.length > 0 && isStudyDay(current, holidayMap).allowed) {
+      meetings.push({
+        date: format(current, 'yyyy-MM-dd'),
+        dayOfWeek: current.getDay(),
+      });
+    }
+    current = addDays(current, 1);
+  }
+
+  return meetings;
+}
+
+function pickEvenlySpacedIndices(count: number, total: number): number[] {
+  if (count <= 0 || total <= 0) return [];
+  if (count === 1) return [total - 1];
+
+  return Array.from({ length: count }, (_, index) =>
+    Math.round((index / (count - 1)) * (total - 1)),
+  );
+}
+
+function spreadSessionsEvenly(
+  sessions: ScheduledSession[],
+  start: Date,
+  end: Date,
+  timeSlots: TimeSlot[],
+  holidayMap: ReturnType<typeof getIsraeliHolidays>,
+): ScheduledSession[] {
+  const meetings = collectValidMeetingDates(start, end, timeSlots, holidayMap);
+  if (meetings.length < sessions.length) return sessions;
+
+  const indices = pickEvenlySpacedIndices(sessions.length, meetings.length);
+
+  return sessions.map((session, index) => {
+    const meeting = meetings[indices[index]];
+    return {
+      ...session,
+      date: meeting.date,
+      dayOfWeek: meeting.dayOfWeek,
+    };
+  });
+}
+
+function spreadSequentialSessionsByWeek(
+  sessions: ScheduledSession[],
+  start: Date,
+  end: Date,
+  timeSlots: TimeSlot[],
+  holidayMap: ReturnType<typeof getIsraeliHolidays>,
+): ScheduledSession[] {
+  const weekGroups = groupSessionsByWeek(sessions);
+  const validWeeks = getValidWeekKeys(start, end, timeSlots, holidayMap);
+
+  if (validWeeks.length < weekGroups.length) return sessions;
+
+  const pickedWeeks = pickEvenlySpacedIndices(weekGroups.length, validWeeks.length).map(
+    (index) => validWeeks[index],
+  );
+
+  return weekGroups.flatMap((group, index) => {
+    const oldWeekKey = getWeekKey(parseISO(group[0].date));
+    const dayOffset = differenceInCalendarDays(parseISO(pickedWeeks[index]), parseISO(oldWeekKey));
+
+    return group.map((session) => {
+      const newDate = addDays(parseISO(session.date), dayOffset);
+      return {
+        ...session,
+        date: format(newDate, 'yyyy-MM-dd'),
+        dayOfWeek: newDate.getDay(),
+      };
+    });
+  });
+}
+
+export function getMinimumPeriodEndDate(startDate: string, years: number): string {
+  return format(addYears(parseISO(startDate), years), 'yyyy-MM-dd');
+}
+
+function spreadSessionsToMinimumPeriod(
+  sessions: ScheduledSession[],
+  startDate: string,
+  minimumYears: number,
+  timeSlots: TimeSlot[],
+  enforceSequentialTracks: boolean,
+): ScheduledSession[] {
+  if (sessions.length === 0 || minimumYears <= 0) return sessions;
+
+  const start = parseISO(startDate);
+  const minEnd = addYears(start, minimumYears);
+  const lastDate = parseISO(sessions[sessions.length - 1].date);
+  if (!isBefore(lastDate, minEnd)) return sessions;
+
+  const holidayMap = getIsraeliHolidays(startDate, format(minEnd, 'yyyy-MM-dd'));
+
+  if (enforceSequentialTracks) {
+    return spreadSequentialSessionsByWeek(sessions, start, minEnd, timeSlots, holidayMap);
+  }
+
+  return spreadSessionsEvenly(sessions, start, minEnd, timeSlots, holidayMap);
 }
 
 const MAX_SCHEDULE_DAYS = 365 * 4;
@@ -168,6 +319,7 @@ export function buildSchedule({
   timeSlots,
   endDateMode,
   manualEndDate,
+  minimumPeriodYears = 0,
 }: BuildScheduleParams): ScheduleResult {
   const empty: ScheduleResult = {
     sessions: [],
@@ -303,22 +455,40 @@ export function buildSchedule({
     current = addDays(current, 1);
   }
 
+  let finalSessions = sessions;
+  if (!isManual && minimumPeriodYears > 0) {
+    finalSessions = spreadSessionsToMinimumPeriod(
+      sessions,
+      startDate,
+      minimumPeriodYears,
+      timeSlots,
+      enforceSequentialTracks,
+    );
+  }
+
   let endDate: string;
   if (isManual && manualEndDate) {
     endDate = manualEndDate;
   } else {
-    endDate = sessions.length > 0 ? sessions[sessions.length - 1].date : startDate;
+    const naturalEnd =
+      finalSessions.length > 0 ? finalSessions[finalSessions.length - 1].date : startDate;
+    if (minimumPeriodYears > 0) {
+      const minEnd = getMinimumPeriodEndDate(startDate, minimumPeriodYears);
+      endDate = naturalEnd > minEnd ? naturalEnd : minEnd;
+    } else {
+      endDate = naturalEnd;
+    }
   }
 
   return {
-    sessions,
+    sessions: finalSessions,
     endDate,
     skippedDays,
     totalLessons,
     assignedLessons: queueIndex,
     fitsCompletely: queueIndex >= totalScheduleItems,
     periodCapacity: isManual ? periodCapacity : queueIndex,
-    meetingCount: isManual ? meetingCount : sessions.length,
+    meetingCount: isManual ? meetingCount : finalSessions.length,
   };
 }
 

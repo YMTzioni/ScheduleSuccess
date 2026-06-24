@@ -5,6 +5,7 @@ import { DocumentPreview } from './components/DocumentPreview';
 import { buildSchedule, countScheduledLessons } from './utils/scheduleGenerator';
 import { getScheduleFitStatus } from './utils/scheduleRecommendations';
 import { getTotalLessonCount } from './data/tracks';
+import { getScheduleTemplate } from './utils/scheduleTemplates';
 import type { EndDateMode, ScheduleTemplateId, TimeSlot } from './types';
 import logoUrl from './assets/logo.png';
 import './App.css';
@@ -40,8 +41,9 @@ function App() {
       timeSlots,
       endDateMode,
       manualEndDate: endDateMode === 'manual' ? manualEndDate : undefined,
+      minimumPeriodYears: getScheduleTemplate(scheduleTemplateId).periodYears,
     });
-  }, [trackIds, startDate, timeSlots, endDateMode, manualEndDate]);
+  }, [trackIds, startDate, timeSlots, endDateMode, manualEndDate, scheduleTemplateId]);
 
   const {
     sessions,

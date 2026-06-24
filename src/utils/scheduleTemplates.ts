@@ -32,13 +32,13 @@ export const SCHEDULE_TEMPLATES: ScheduleTemplate[] = [
   {
     id: 'michael',
     name: 'מיכאל',
-    description: '2 ימי לימוד בשבוע (לבחירתך) · 8 שעות ביום משעת התחלה · תאריך סיום אוטומטי',
+    description: '2 ימי לימוד בשבוע · 8 שעות ביום · תקופה מינימום שנה · סיום אוטומטי',
     sessionsPerWeek: 2,
     hoursPerSession: 8,
     studyDays: [0, 3],
     minHoursPerSession: 8,
     endDateMode: 'auto',
-    periodYears: 0,
+    periodYears: 1,
   },
 ];
 

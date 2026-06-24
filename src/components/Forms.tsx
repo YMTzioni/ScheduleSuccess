@@ -14,6 +14,7 @@ import { getLessonCountForSlot } from '../utils/scheduleGenerator';
 import type { ScheduleFitStatus } from '../utils/scheduleRecommendations';
 import {
   getScheduleTemplate,
+  getTemplateEndDate,
   SCHEDULE_TEMPLATES,
   slotMeetsMinHours,
 } from '../utils/scheduleTemplates';
@@ -445,6 +446,7 @@ export function ScheduleBuilder({
         <div className="recommendation-panel recommendation-ok template-michael-panel">
           <strong>תבנית מיכאל פעילה</strong>
           <ul>
+            <li>תקופת לימודים מינימום שנה מלאה — גם במסלול בודד</li>
             <li>תאריך סיום מחושב אוטומטית לפי המסלולים</li>
             {trackIds.length > 1 && (
               <li>מסלולים לפי סדר — מסלול אחד בכל שבוע, ללא ערבוב</li>
@@ -469,6 +471,12 @@ export function ScheduleBuilder({
             {calculatedEndDate && (
               <li>
                 תאריך סיום משוער: <span dir="ltr">{formatDateHeDisplay(calculatedEndDate)}</span>
+              </li>
+            )}
+            {startDate && !calculatedEndDate && (
+              <li>
+                תאריך סיום מינימלי:{' '}
+                <span dir="ltr">{formatDateHeDisplay(getTemplateEndDate(startDate, activeTemplate.periodYears))}</span>
               </li>
             )}
           </ul>
@@ -805,7 +813,7 @@ export function ScheduleBuilder({
 
       <p className="hint">
         {isMichaelTemplate
-          ? 'תבנית מיכאל: מסלולים לפי סדר (מסלול אחד בכל שבוע), 2 ימים בשבוע, 8 שעות ביום משעת ההתחלה שבחרת. תאריך הסיום מחושב אוטומטית.'
+          ? 'תבנית מיכאל: תקופת לימודים של שנה לפחות, מסלולים לפי סדר (מסלול אחד בכל שבוע), 2 ימים בשבוע, 8 שעות ביום משעת ההתחלה שבחרת.'
           : endDateMode === 'auto'
             ? 'המערכת תחשב אוטומטית את תאריך הסיום לפי מספר השיעורים, ימי הלימוד והשעות, תוך דילוג על שבתות וחגים.'
             : 'במצב ידני: קודם בחר תאריכים וחלוקה, ואז המערכת תבנה את ימי הלימוד עבורך.'}
