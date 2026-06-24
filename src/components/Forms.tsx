@@ -289,8 +289,8 @@ export function ScheduleBuilder({
       onTimeSlotsChange([]);
       setDistributionApplied(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- apply michael slots when days change
-  }, [isMichaelTemplate, startDate, selectedDays.join(',')]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- apply michael slots when days or start time change
+  }, [isMichaelTemplate, startDate, selectedDays.join(','), newStart]);
 
   useEffect(() => {
     if (isMichaelTemplate || distributionOptions.length === 0) return;
@@ -305,6 +305,8 @@ export function ScheduleBuilder({
     onScheduleTemplateIdChange(id);
     if (id === 'michael') {
       setSelectedDays([0, 3]);
+      setNewStart(DEFAULT_START);
+      setNewEnd(MICHAEL_DEFAULT_END);
     }
     if (id === 'custom') {
       setDistributionApplied(false);
@@ -341,7 +343,7 @@ export function ScheduleBuilder({
     const slots = buildTimeSlotsFromDistribution(
       days,
       activeTemplate.hoursPerSession,
-      DEFAULT_START,
+      newStart,
     );
     onTimeSlotsChange(slots);
     setDistributionApplied(true);
@@ -453,7 +455,17 @@ export function ScheduleBuilder({
                 ? `: ${selectedDays.map((d) => DAY_NAMES[d]).join(' ו')}`
                 : ' — בחר ימים למטה'}
             </li>
-            <li>8 שעות לימוד בכל יום (09:00–17:00)</li>
+            <li>
+              8 שעות לימוד בכל יום
+              {selectedDays.length === 2 ? (
+                <>
+                  {' '}
+                  (<span dir="ltr">{newStart}–{newEnd}</span>)
+                </>
+              ) : (
+                ' — בחר שעת התחלה למטה'
+              )}
+            </li>
             {calculatedEndDate && (
               <li>
                 תאריך סיום משוער: <span dir="ltr">{formatDateHeDisplay(calculatedEndDate)}</span>
@@ -484,6 +496,21 @@ export function ScheduleBuilder({
           {selectedDays.length < 2 && (
             <p className="slot-min-hours-hint">יש לבחור בדיוק 2 ימי לימוד בשבוע</p>
           )}
+
+          <div className="michael-time-picker">
+            <label>
+              שעת התחלה
+              <input
+                type="time"
+                value={newStart}
+                onChange={(e) => handleStartTimeChange(e.target.value)}
+                dir="ltr"
+              />
+            </label>
+            <p className="michael-time-summary" dir="ltr">
+              סיום: {newEnd} ({activeTemplate.hoursPerSession} שעות)
+            </p>
+          </div>
         </div>
       )}
 
@@ -778,7 +805,7 @@ export function ScheduleBuilder({
 
       <p className="hint">
         {isMichaelTemplate
-          ? 'תבנית מיכאל: מסלולים לפי סדר (מסלול אחד בכל שבוע), 2 ימים בשבוע, 8 שעות ביום. תאריך הסיום מחושב אוטומטית.'
+          ? 'תבנית מיכאל: מסלולים לפי סדר (מסלול אחד בכל שבוע), 2 ימים בשבוע, 8 שעות ביום משעת ההתחלה שבחרת. תאריך הסיום מחושב אוטומטית.'
           : endDateMode === 'auto'
             ? 'המערכת תחשב אוטומטית את תאריך הסיום לפי מספר השיעורים, ימי הלימוד והשעות, תוך דילוג על שבתות וחגים.'
             : 'במצב ידני: קודם בחר תאריכים וחלוקה, ואז המערכת תבנה את ימי הלימוד עבורך.'}
