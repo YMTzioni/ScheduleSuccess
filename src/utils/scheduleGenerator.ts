@@ -1,23 +1,16 @@
-import {
-  addDays,
-  addMonths,
-  addYears,
-  endOfMonth,
-  format,
-  isAfter,
-  max,
-  min,
-  parseISO,
-  startOfMonth,
-} from 'date-fns';
+import { addDays, addYears, format, isAfter, parseISO } from 'date-fns';
 import type { EndDateMode, ScheduledSession, TimeSlot } from '../types';
 import { TRACKS, getTotalLessonCount } from '../data/tracks';
 import { getIsraeliHolidays, isStudyDay } from './holidays';
 
 export const FINAL_EXAM_TITLE = 'מבחן סיום';
 export const CERTIFICATE_TITLE = 'חלוקת תעודות';
-export const PRACTICE_TITLE = 'תרגול חומר';
-const PRACTICE_SESSIONS_PER_MONTH = 2;
+export const PRACTICE_TITLE = 'תרגול';
+export const PROJECT_BUILDING_TITLE = 'בניית פרויקטים';
+export const PROJECT_PRESENTATION_TITLE = 'הצגת פרויקטים';
+const PRACTICE_EVERY_N_MEETINGS = 4;
+const MAX_PROJECT_BUILDING_SESSIONS = 5;
+const MAX_PROJECT_PRESENTATION_SESSIONS = 1;
 
 export type ScheduleQueueItem =
   | { type: 'lesson'; title: string; trackName: string }
@@ -72,6 +65,123 @@ function isMilestoneTitle(title: string): boolean {
 
 function isPracticeTitle(title: string): boolean {
   return title === PRACTICE_TITLE;
+}
+
+function isSupplementaryTitle(title: string): boolean {
+  return title === PROJECT_BUILDING_TITLE || title === PROJECT_PRESENTATION_TITLE;
+}
+
+function isRealLessonSession(session: ScheduledSession): boolean {
+  return session.lessonItems.some(
+    (item) =>
+      !isMilestoneTitle(item.title) &&
+      !isPracticeTitle(item.title) &&
+      !isSupplementaryTitle(item.title),
+  );
+}
+
+function getLessonsEndDate(sessions: ScheduledSession[], trackName: string): string | null {
+  let lastDate: string | null = null;
+
+  for (const session of sessions) {
+    if (session.lessonItems[0]?.trackName !== trackName) continue;
+    if (!isRealLessonSession(session)) continue;
+    lastDate = session.date;
+  }
+
+  return lastDate;
+}
+
+function pickSpacedMeetingIndices(poolLength: number, desiredCount: number): number[] {
+  if (poolLength <= 0 || desiredCount <= 0) return [];
+  if (desiredCount === 1) return [poolLength - 1];
+
+  const picked: number[] = [];
+  const idealStep = (poolLength - 1) / (desiredCount - 1);
+
+  for (let i = 0; i < desiredCount; i += 1) {
+    let index = Math.round(i * idealStep);
+    if (picked.length > 0 && index - picked[picked.length - 1] < 2) {
+      index = picked[picked.length - 1] + 2;
+    }
+    if (index >= poolLength) break;
+    picked.push(index);
+  }
+
+  return picked;
+}
+
+function scheduleCompletionPhase(
+  sessions: ScheduledSession[],
+  trackName: string,
+  periodStart: Date,
+  periodEnd: Date,
+  timeSlots: TimeSlot[],
+  holidayMap: ReturnType<typeof getIsraeliHolidays>,
+  milestoneCount: number,
+): void {
+  const lessonsEndDate = getLessonsEndDate(sessions, trackName);
+  if (!lessonsEndDate) return;
+
+  const allYearMeetings = collectValidMeetingSlots(
+    periodStart,
+    periodEnd,
+    timeSlots,
+    holidayMap,
+  );
+  const milestoneReservedDates = new Set(
+    allYearMeetings.slice(-milestoneCount).map((slot) => slot.date),
+  );
+  const usedDates = new Set(
+    sessions
+      .filter((session) => session.lessonItems[0]?.trackName === trackName)
+      .map((session) => session.date),
+  );
+
+  const completionPool = allYearMeetings.filter(
+    (slot) =>
+      slot.date > lessonsEndDate &&
+      !usedDates.has(slot.date) &&
+      !milestoneReservedDates.has(slot.date),
+  );
+
+  if (completionPool.length === 0) return;
+
+  const wantsPresentation = MAX_PROJECT_PRESENTATION_SESSIONS > 0;
+  const presentationPoolIndex = wantsPresentation ? completionPool.length - 1 : -1;
+  const buildingPoolLength = wantsPresentation
+    ? Math.max(0, completionPool.length - 2)
+    : completionPool.length;
+
+  if (buildingPoolLength <= 0) return;
+
+  const buildingSlotsCount = Math.min(MAX_PROJECT_BUILDING_SESSIONS, buildingPoolLength);
+  const buildingIndices = pickSpacedMeetingIndices(buildingPoolLength, buildingSlotsCount);
+
+  for (const index of buildingIndices) {
+    const slot = completionPool[index];
+    sessions.push({
+      date: slot.date,
+      dayOfWeek: slot.dayOfWeek,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      lessonItems: [{ title: PROJECT_BUILDING_TITLE, trackName }],
+    });
+  }
+
+  if (wantsPresentation && presentationPoolIndex >= 0) {
+    const lastBuildingIndex = buildingIndices[buildingIndices.length - 1] ?? -2;
+    if (presentationPoolIndex - lastBuildingIndex >= 2) {
+      const slot = completionPool[presentationPoolIndex];
+      sessions.push({
+        date: slot.date,
+        dayOfWeek: slot.dayOfWeek,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        lessonItems: [{ title: PROJECT_PRESENTATION_TITLE, trackName }],
+      });
+    }
+  }
 }
 
 function getWeekKey(date: Date): string {
@@ -143,26 +253,6 @@ export function getLessonCountForSlot(startTime: string, endTime: string): numbe
   return count > 0 ? count : 1;
 }
 
-function getValidWeekKeys(
-  start: Date,
-  end: Date,
-  timeSlots: TimeSlot[],
-  holidayMap: ReturnType<typeof getIsraeliHolidays>,
-): string[] {
-  const weekKeys = new Set<string>();
-  let current = start;
-
-  while (!isAfter(current, end)) {
-    const daySlots = timeSlots.filter((s) => s.dayOfWeek === current.getDay());
-    if (daySlots.length > 0 && isStudyDay(current, holidayMap).allowed) {
-      weekKeys.add(getWeekKey(current));
-    }
-    current = addDays(current, 1);
-  }
-
-  return Array.from(weekKeys).sort();
-}
-
 interface MeetingSlot {
   date: string;
   dayOfWeek: number;
@@ -197,230 +287,92 @@ function collectValidMeetingSlots(
   return meetings;
 }
 
-function remapSession(session: ScheduledSession, slot: MeetingSlot): ScheduledSession {
-  return {
-    ...session,
-    date: slot.date,
-    dayOfWeek: slot.dayOfWeek,
-    startTime: slot.startTime,
-    endTime: slot.endTime,
-  };
+function sortScheduledSessions(sessions: ScheduledSession[]): ScheduledSession[] {
+  return [...sessions].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime),
+  );
 }
 
-function separateLessonAndMilestoneSessions(sessions: ScheduledSession[]): {
-  lessonSessions: ScheduledSession[];
-  milestoneSessions: ScheduledSession[];
-} {
-  const lessonSessions: ScheduledSession[] = [];
-  const milestoneSessions: ScheduledSession[] = [];
+function bumpTrackMeeting(trackMeetingCounts: Map<string, number>, trackName: string): number {
+  const next = (trackMeetingCounts.get(trackName) ?? 0) + 1;
+  trackMeetingCounts.set(trackName, next);
+  return next;
+}
 
-  for (const session of sessions) {
-    if (
-      session.lessonItems.length === 1 &&
-      (isMilestoneTitle(session.lessonItems[0].title) ||
-        isPracticeTitle(session.lessonItems[0].title))
-    ) {
-      if (isMilestoneTitle(session.lessonItems[0].title)) {
-        milestoneSessions.push(session);
-      }
-    } else {
-      lessonSessions.push(session);
-    }
+function wasLastTrackSessionPractice(
+  sessions: ScheduledSession[],
+  trackName: string,
+): boolean {
+  for (let i = sessions.length - 1; i >= 0; i -= 1) {
+    const session = sessions[i];
+    const name = session.lessonItems[0]?.trackName;
+    if (name !== trackName) continue;
+    return (
+      session.lessonItems.length === 1 && isPracticeTitle(session.lessonItems[0].title)
+    );
   }
-
-  return { lessonSessions, milestoneSessions };
+  return false;
 }
 
-function createPracticeSession(slot: MeetingSlot, trackName: string): ScheduledSession {
-  return {
-    date: slot.date,
-    dayOfWeek: slot.dayOfWeek,
+function shouldSchedulePracticeMeeting(
+  sessions: ScheduledSession[],
+  trackName: string,
+  meetingNumber: number,
+): boolean {
+  if (meetingNumber % PRACTICE_EVERY_N_MEETINGS !== 0) return false;
+  return !wasLastTrackSessionPractice(sessions, trackName);
+}
+
+function schedulePracticeSession(
+  sessions: ScheduledSession[],
+  dateStr: string,
+  dayOfWeek: number,
+  slot: TimeSlot,
+  trackName: string,
+  current: Date,
+  weekTrackMap: Map<string, string>,
+  enforceSequentialTracks: boolean,
+): void {
+  sessions.push({
+    date: dateStr,
+    dayOfWeek,
     startTime: slot.startTime,
     endTime: slot.endTime,
     lessonItems: [{ title: PRACTICE_TITLE, trackName }],
-  };
+  });
+  markWeekTrack(current, trackName, weekTrackMap, enforceSequentialTracks);
 }
 
-function seededShuffle<T>(items: T[], seed: string): T[] {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash = (Math.imul(31, hash) + seed.charCodeAt(i)) | 0;
-  }
-
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    hash = Math.imul(hash ^ (hash >>> 15), hash | 1);
-    hash ^= hash + Math.imul(hash ^ (hash >>> 7), hash | 61);
-    const j = ((hash ^ (hash >>> 14)) >>> 0) % (i + 1);
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-
-  return copy;
-}
-
-function pickRandomPracticeSlots(
+function scheduleDeferredMilestones(
+  sessions: ScheduledSession[],
+  deferredMilestones: ScheduleQueueItem[],
   periodStart: Date,
   periodEnd: Date,
   timeSlots: TimeSlot[],
   holidayMap: ReturnType<typeof getIsraeliHolidays>,
-  usedDates: Set<string>,
-  seed: string,
-): MeetingSlot[] {
-  const picked: MeetingSlot[] = [];
-  let monthCursor = startOfMonth(periodStart);
+): void {
+  if (deferredMilestones.length === 0) return;
 
-  while (!isAfter(monthCursor, periodEnd)) {
-    const monthStart = max([monthCursor, periodStart]);
-    const monthEnd = min([endOfMonth(monthCursor), periodEnd]);
-    const monthMeetings = collectValidMeetingSlots(monthStart, monthEnd, timeSlots, holidayMap).filter(
-      (slot) => !usedDates.has(slot.date),
-    );
-    const shuffled = seededShuffle(monthMeetings, `${seed}-${format(monthCursor, 'yyyy-MM')}`);
-
-    for (const slot of shuffled.slice(0, PRACTICE_SESSIONS_PER_MONTH)) {
-      usedDates.add(slot.date);
-      picked.push(slot);
-    }
-
-    monthCursor = addMonths(monthCursor, 1);
-  }
-
-  return picked;
-}
-
-function allocateTrackWithRandomPractice(
-  trackSessions: ScheduledSession[],
-  periodStart: Date,
-  periodEnd: Date,
-  timeSlots: TimeSlot[],
-  holidayMap: ReturnType<typeof getIsraeliHolidays>,
-  seed: string,
-): ScheduledSession[] {
-  if (trackSessions.length === 0) return [];
-
-  const { lessonSessions, milestoneSessions } = separateLessonAndMilestoneSessions(trackSessions);
-  const trackName = trackSessions[0].lessonItems[0].trackName;
   const allMeetings = collectValidMeetingSlots(periodStart, periodEnd, timeSlots, holidayMap);
-  const lessonCount = lessonSessions.length;
-  const milestoneCount = milestoneSessions.length;
+  const usedDates = new Set(sessions.map((session) => session.date));
+  const available = allMeetings.filter((slot) => !usedDates.has(slot.date));
+  const milestoneSlots =
+    available.length >= deferredMilestones.length
+      ? available.slice(available.length - deferredMilestones.length)
+      : allMeetings.slice(allMeetings.length - deferredMilestones.length);
 
-  if (allMeetings.length < lessonCount + milestoneCount) {
-    return trackSessions.map((session, index) =>
-      remapSession(session, allMeetings[Math.min(index, allMeetings.length - 1)]),
-    );
-  }
+  deferredMilestones.forEach((item, index) => {
+    const slot = milestoneSlots[index];
+    if (!slot) return;
 
-  const lessonSlots = allMeetings.slice(0, lessonCount);
-  const milestoneSlots = allMeetings.slice(allMeetings.length - milestoneCount);
-  const usedDates = new Set([...lessonSlots, ...milestoneSlots].map((slot) => slot.date));
-  const practiceSlots = pickRandomPracticeSlots(
-    periodStart,
-    periodEnd,
-    timeSlots,
-    holidayMap,
-    usedDates,
-    seed,
-  );
-
-  return [
-    ...lessonSessions.map((session, index) => remapSession(session, lessonSlots[index])),
-    ...practiceSlots.map((slot) => createPracticeSession(slot, trackName)),
-    ...milestoneSessions.map((session, index) => remapSession(session, milestoneSlots[index])),
-  ].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
-}
-
-function partitionTrackSessions(
-  sessions: ScheduledSession[],
-): { trackName: string; sessions: ScheduledSession[] }[] {
-  const tracks: { trackName: string; sessions: ScheduledSession[] }[] = [];
-
-  for (const session of sessions) {
-    const trackName = session.lessonItems[0].trackName;
-    const last = tracks[tracks.length - 1];
-
-    if (last && last.trackName === trackName) {
-      last.sessions.push(session);
-    } else {
-      tracks.push({ trackName, sessions: [session] });
-    }
-  }
-
-  return tracks;
-}
-
-function splitWeeksAmongTracks(weeks: string[], trackCount: number): string[][] {
-  const result = Array.from({ length: trackCount }, () => [] as string[]);
-  const baseWeeks = Math.floor(weeks.length / trackCount);
-  let remainder = weeks.length % trackCount;
-  let offset = 0;
-
-  for (let trackIndex = 0; trackIndex < trackCount; trackIndex += 1) {
-    const trackWeekCount = baseWeeks + (remainder > 0 ? 1 : 0);
-    if (remainder > 0) remainder -= 1;
-    result[trackIndex] = weeks.slice(offset, offset + trackWeekCount);
-    offset += trackWeekCount;
-  }
-
-  return result;
-}
-
-function padSessionsWithPracticeDays(
-  sessions: ScheduledSession[],
-  startDate: string,
-  minimumYears: number,
-  timeSlots: TimeSlot[],
-  enforceSequentialTracks: boolean,
-): ScheduledSession[] {
-  if (sessions.length === 0 || minimumYears <= 0) return sessions;
-
-  const start = parseISO(startDate);
-  const minEnd = addYears(start, minimumYears);
-  const lastDate = parseISO(sessions[sessions.length - 1].date);
-  const periodEnd = isAfter(lastDate, minEnd) ? lastDate : minEnd;
-  const holidayMap = getIsraeliHolidays(startDate, format(periodEnd, 'yyyy-MM-dd'));
-  const trackPartitions = partitionTrackSessions(sessions);
-
-  if (!enforceSequentialTracks || trackPartitions.length === 1) {
-    return allocateTrackWithRandomPractice(
-      sessions,
-      start,
-      periodEnd,
-      timeSlots,
-      holidayMap,
-      startDate,
-    );
-  }
-
-  const validWeeks = getValidWeekKeys(start, periodEnd, timeSlots, holidayMap);
-  const weeksPerTrack = splitWeeksAmongTracks(validWeeks, trackPartitions.length);
-
-  return trackPartitions
-    .flatMap((track, index) => {
-      const trackWeeks = weeksPerTrack[index];
-      if (trackWeeks.length === 0) {
-        return allocateTrackWithRandomPractice(
-          track.sessions,
-          start,
-          periodEnd,
-          timeSlots,
-          holidayMap,
-          `${startDate}-${track.trackName}`,
-        );
-      }
-
-      const trackStart = parseISO(trackWeeks[0]);
-      const trackEnd = min([addDays(parseISO(trackWeeks[trackWeeks.length - 1]), 6), periodEnd]);
-
-      return allocateTrackWithRandomPractice(
-        track.sessions,
-        trackStart,
-        trackEnd,
-        timeSlots,
-        holidayMap,
-        `${startDate}-${track.trackName}`,
-      );
-    })
-    .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+    sessions.push({
+      date: slot.date,
+      dayOfWeek: slot.dayOfWeek,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      lessonItems: [queueItemToLessonItem(item)],
+    });
+  });
 }
 
 export function getMinimumPeriodEndDate(startDate: string, years: number): string {
@@ -495,6 +447,7 @@ export function buildSchedule({
   const scheduleQueue = buildScheduleQueue(trackIds);
   const totalScheduleItems = scheduleQueue.length;
   const enforceSequentialTracks = trackIds.length > 1;
+  const usePracticeEveryFourth = minimumPeriodYears > 0;
 
   if (totalScheduleItems === 0) {
     return { ...empty, endDate: startDate, totalLessons: 0, fitsCompletely: true };
@@ -510,9 +463,16 @@ export function buildSchedule({
   }
 
   const manualEnd = isManual && manualEndDate ? parseISO(manualEndDate) : null;
+  const minEndDate =
+    !isManual && minimumPeriodYears > 0
+      ? addYears(parseISO(startDate), minimumPeriodYears)
+      : null;
   const searchEnd = isManual
     ? manualEndDate!
-    : format(addYears(parseISO(startDate), 4), 'yyyy-MM-dd');
+    : format(
+        minEndDate ? addYears(minEndDate, 1) : addYears(parseISO(startDate), 4),
+        'yyyy-MM-dd',
+      );
 
   const holidayMap = getIsraeliHolidays(startDate, searchEnd);
   const { lessonCapacity: periodCapacity, meetingCount } = isManual
@@ -522,12 +482,19 @@ export function buildSchedule({
   const sessions: ScheduledSession[] = [];
   const skippedDays: { date: string; reason: string }[] = [];
   const weekTrackMap = new Map<string, string>();
+  const trackMeetingCounts = new Map<string, number>();
+  const deferredMilestones: ScheduleQueueItem[] = [];
   let blockUntilAfterWeek: string | null = null;
   let queueIndex = 0;
   let current = parseISO(startDate);
 
+  const shouldContinueScheduling = (): boolean => {
+    if (isManual) return true;
+    return queueIndex < totalScheduleItems;
+  };
+
   for (let day = 0; day < MAX_SCHEDULE_DAYS; day += 1) {
-    if (!isManual && queueIndex >= totalScheduleItems) break;
+    if (!shouldContinueScheduling()) break;
     if (isManual && manualEnd && isAfter(current, manualEnd)) break;
 
     const dateStr = format(current, 'yyyy-MM-dd');
@@ -559,6 +526,13 @@ export function buildSchedule({
           }
 
           if (isMilestoneItem(currentItem)) {
+            if (usePracticeEveryFourth) {
+              deferredMilestones.push(currentItem);
+              queueIndex += 1;
+              continue;
+            }
+
+            bumpTrackMeeting(trackMeetingCounts, trackName);
             sessions.push({
               date: dateStr,
               dayOfWeek,
@@ -574,6 +548,25 @@ export function buildSchedule({
 
             queueIndex += 1;
             continue;
+          }
+
+          if (usePracticeEveryFourth) {
+            const meetingNumber = bumpTrackMeeting(trackMeetingCounts, trackName);
+            if (shouldSchedulePracticeMeeting(sessions, trackName, meetingNumber)) {
+              schedulePracticeSession(
+                sessions,
+                dateStr,
+                dayOfWeek,
+                slot,
+                trackName,
+                current,
+                weekTrackMap,
+                enforceSequentialTracks,
+              );
+              continue;
+            }
+          } else {
+            bumpTrackMeeting(trackMeetingCounts, trackName);
           }
 
           const maxLessonsInSlot = getLessonCountForSlot(slot.startTime, slot.endTime);
@@ -606,20 +599,36 @@ export function buildSchedule({
       }
     }
 
-    if (!isManual && queueIndex >= totalScheduleItems) break;
     current = addDays(current, 1);
   }
 
-  let finalSessions = sessions;
-  if (!isManual && minimumPeriodYears > 0) {
-    finalSessions = padSessionsWithPracticeDays(
+  const periodEnd = minEndDate ?? current;
+  if (usePracticeEveryFourth && minEndDate && trackIds.length === 1) {
+    const trackName = TRACKS.find((t) => t.id === trackIds[0])?.name;
+    if (trackName) {
+      scheduleCompletionPhase(
+        sessions,
+        trackName,
+        parseISO(startDate),
+        periodEnd,
+        timeSlots,
+        holidayMap,
+        deferredMilestones.length,
+      );
+    }
+  }
+  if (usePracticeEveryFourth && deferredMilestones.length > 0) {
+    scheduleDeferredMilestones(
       sessions,
-      startDate,
-      minimumPeriodYears,
+      deferredMilestones,
+      parseISO(startDate),
+      periodEnd,
       timeSlots,
-      enforceSequentialTracks,
+      holidayMap,
     );
   }
+
+  const finalSessions = sortScheduledSessions(sessions);
 
   let endDate: string;
   if (isManual && manualEndDate) {
@@ -651,7 +660,9 @@ export function countScheduledLessons(sessions: ScheduledSession[]): number {
   return sessions.reduce((sum, session) => {
     const lessonCount = session.lessonItems.filter(
       (item) =>
-        !isMilestoneTitle(item.title) && !isPracticeTitle(item.title),
+        !isMilestoneTitle(item.title) &&
+        !isPracticeTitle(item.title) &&
+        !isSupplementaryTitle(item.title),
     ).length;
     return sum + lessonCount;
   }, 0);
