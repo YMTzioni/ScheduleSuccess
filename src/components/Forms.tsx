@@ -442,17 +442,25 @@ export function ScheduleBuilder({
         </div>
       </div>
 
-      {isMichaelTemplate && startDate && (
-        <div className="recommendation-panel recommendation-ok template-michael-panel">
-          <strong>תבנית מיכאל פעילה</strong>
+      {activeTemplate.structuredTrackFlow && startDate && (
+        <div className="recommendation-panel recommendation-ok template-structured-panel">
+          <strong>מבנה לוז מובנה</strong>
           <ul>
             <li>תרגול — כל מפגש רביעי, ללא שני מפגשי תרגול רצופים</li>
             <li>השלמת מסלול: בניית פרויקטים (עד 5) + הצגת פרויקטים (מפגש 1)</li>
             <li>סיום כל מסלול: מבחן סיום ואחריו חלוקת תעודות</li>
-            <li>תאריך סיום מחושב אוטומטית — מינימום שנה שלמה מתאריך ההתחלה</li>
             {trackIds.length > 1 && (
               <li>מסלולים לפי סדר — מסלול אחד בכל שבוע, ללא ערבוב וללא התנגשות בתאריכים</li>
             )}
+          </ul>
+        </div>
+      )}
+
+      {isMichaelTemplate && startDate && (
+        <div className="recommendation-panel recommendation-ok template-michael-panel">
+          <strong>תבנית מיכאל פעילה</strong>
+          <ul>
+            <li>תאריך סיום מחושב אוטומטית — מינימום שנה שלמה מתאריך ההתחלה</li>
             <li>
               2 ימי לימוד בשבוע
               {selectedDays.length === 2
@@ -815,14 +823,24 @@ export function ScheduleBuilder({
 
       <p className="hint">
         {isMichaelTemplate
-          ? `תבנית מיכאל: שנה לפחות מתאריך ההתחלה. כל מפגש רביעי תרגול. בכל מסלול: שיעורים, השלמות, מבחן סיום וחלוקת תעודות בסוף.${
+          ? `תבנית מיכאל: שנה לפחות מתאריך ההתחלה.${
               trackIds.length > 1
                 ? ' מסלולים מרובים נלמדים לפי הסדר — מסלול אחד בכל שבוע, ללא למידה במקביל.'
                 : ''
             }`
-          : endDateMode === 'auto'
-            ? 'המערכת תחשב אוטומטית את תאריך הסיום לפי מספר השיעורים, ימי הלימוד והשעות, תוך דילוג על שבתות וחגים.'
-            : 'במצב ידני: קודם בחר תאריכים וחלוקה, ואז המערכת תבנה את ימי הלימוד עבורך.'}
+          : activeTemplate.structuredTrackFlow
+            ? `לוז מובנה: כל מפגש רביעי תרגול. בכל מסלול: שיעורים, השלמות, מבחן סיום וחלוקת תעודות בסוף.${
+                trackIds.length > 1
+                  ? ' מסלולים מרובים נלמדים לפי הסדר — מסלול אחד בכל שבוע.'
+                  : ''
+              } ${
+                endDateMode === 'auto'
+                  ? 'תאריך הסיום יחושב אוטומטית לפי מספר השיעורים, ימי הלימוד והשעות.'
+                  : 'במצב ידני: קודם בחר תאריכים וחלוקה, ואז המערכת תבנה את ימי הלימוד עבורך.'
+              }`
+            : endDateMode === 'auto'
+              ? 'המערכת תחשב אוטומטית את תאריך הסיום לפי מספר השיעורים, ימי הלימוד והשעות, תוך דילוג על שבתות וחגים.'
+              : 'במצב ידני: קודם בחר תאריכים וחלוקה, ואז המערכת תבנה את ימי הלימוד עבורך.'}
       </p>
     </section>
   );

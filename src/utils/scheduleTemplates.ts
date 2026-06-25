@@ -15,6 +15,7 @@ export interface ScheduleTemplate {
   minHoursPerSession: number;
   endDateMode: EndDateMode;
   periodYears: number;
+  structuredTrackFlow: boolean;
 }
 
 export const SCHEDULE_TEMPLATES: ScheduleTemplate[] = [
@@ -28,6 +29,7 @@ export const SCHEDULE_TEMPLATES: ScheduleTemplate[] = [
     minHoursPerSession: 1,
     endDateMode: 'auto',
     periodYears: 0,
+    structuredTrackFlow: true,
   },
   {
     id: 'michael',
@@ -39,6 +41,7 @@ export const SCHEDULE_TEMPLATES: ScheduleTemplate[] = [
     minHoursPerSession: 8,
     endDateMode: 'auto',
     periodYears: 1,
+    structuredTrackFlow: true,
   },
 ];
 

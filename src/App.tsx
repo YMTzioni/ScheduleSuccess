@@ -42,6 +42,7 @@ function App() {
       endDateMode,
       manualEndDate: endDateMode === 'manual' ? manualEndDate : undefined,
       minimumPeriodYears: getScheduleTemplate(scheduleTemplateId).periodYears,
+      structuredTrackFlow: getScheduleTemplate(scheduleTemplateId).structuredTrackFlow,
     });
   }, [trackIds, startDate, timeSlots, endDateMode, manualEndDate, scheduleTemplateId]);
 

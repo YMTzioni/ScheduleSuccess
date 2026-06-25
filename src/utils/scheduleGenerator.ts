@@ -288,6 +288,7 @@ export interface BuildScheduleParams {
   endDateMode: EndDateMode;
   manualEndDate?: string;
   minimumPeriodYears?: number;
+  structuredTrackFlow?: boolean;
 }
 
 export interface ScheduleResult {
@@ -403,75 +404,6 @@ function schedulePracticeSession(
   markWeekTrack(current, trackName, weekTrackMap, enforceSequentialTracks);
 }
 
-function scheduleTrackClosingMilestones(
-  sessions: ScheduledSession[],
-  milestones: ScheduleQueueItem[],
-  trackName: string,
-  periodStart: Date,
-  periodEnd: Date,
-  timeSlots: TimeSlot[],
-  holidayMap: ReturnType<typeof getIsraeliHolidays>,
-): void {
-  if (milestones.length === 0) return;
-
-  const orderedMilestones = [...milestones].sort((a, b) => {
-    if (a.type === 'final_exam' && b.type === 'certificate') return -1;
-    if (a.type === 'certificate' && b.type === 'final_exam') return 1;
-    return 0;
-  });
-
-  const trackSessionDates = sessions
-    .filter((session) => session.lessonItems[0]?.trackName === trackName)
-    .map((session) => session.date)
-    .sort();
-  const lastActivityDate = trackSessionDates.at(-1) ?? format(periodStart, 'yyyy-MM-dd');
-
-  const allMeetings = collectValidMeetingSlots(periodStart, periodEnd, timeSlots, holidayMap);
-  const usedDates = new Set(sessions.map((session) => session.date));
-  const closingCandidates = allMeetings.filter(
-    (slot) => slot.date > lastActivityDate && !usedDates.has(slot.date),
-  );
-
-  const milestoneSlots =
-    closingCandidates.length >= orderedMilestones.length
-      ? closingCandidates.slice(closingCandidates.length - orderedMilestones.length)
-      : allMeetings.filter((slot) => !usedDates.has(slot.date)).slice(-orderedMilestones.length);
-
-  orderedMilestones.forEach((item, index) => {
-    const slot = milestoneSlots[index];
-    if (!slot) return;
-
-    sessions.push({
-      date: slot.date,
-      dayOfWeek: slot.dayOfWeek,
-      startTime: slot.startTime,
-      endTime: slot.endTime,
-      lessonItems: [queueItemToLessonItem(item)],
-    });
-  });
-}
-
-function scheduleDeferredMilestones(
-  sessions: ScheduledSession[],
-  deferredMilestones: ScheduleQueueItem[],
-  periodStart: Date,
-  periodEnd: Date,
-  timeSlots: TimeSlot[],
-  holidayMap: ReturnType<typeof getIsraeliHolidays>,
-): void {
-  if (deferredMilestones.length === 0) return;
-
-  scheduleTrackClosingMilestones(
-    sessions,
-    deferredMilestones,
-    deferredMilestones[0].trackName,
-    periodStart,
-    periodEnd,
-    timeSlots,
-    holidayMap,
-  );
-}
-
 function finalizeMichaelTrackSegment(
   sessions: ScheduledSession[],
   trackName: string,
@@ -546,6 +478,7 @@ export function buildSchedule({
   endDateMode,
   manualEndDate,
   minimumPeriodYears = 0,
+  structuredTrackFlow = true,
 }: BuildScheduleParams): ScheduleResult {
   const empty: ScheduleResult = {
     sessions: [],
@@ -566,7 +499,7 @@ export function buildSchedule({
   const scheduleQueue = buildScheduleQueue(trackIds);
   const totalScheduleItems = scheduleQueue.length;
   const enforceSequentialTracks = trackIds.length > 1;
-  const usePracticeEveryFourth = minimumPeriodYears > 0;
+  const useStructuredTrackFlow = structuredTrackFlow;
 
   if (totalScheduleItems === 0) {
     return { ...empty, endDate: startDate, totalLessons: 0, fitsCompletely: true };
@@ -586,6 +519,7 @@ export function buildSchedule({
     !isManual && minimumPeriodYears > 0
       ? addYears(parseISO(startDate), minimumPeriodYears)
       : null;
+  const closingMinEndDate = minEndDate ?? manualEnd;
   const searchEnd = isManual
     ? manualEndDate!
     : format(
@@ -614,8 +548,8 @@ export function buildSchedule({
   let queueIndex = 0;
   let current = parseISO(startDate);
 
-  const useMultiTrackMichael =
-    !isManual && enforceSequentialTracks && usePracticeEveryFourth && minEndDate;
+  const useMultiTrackStructured =
+    enforceSequentialTracks && useStructuredTrackFlow;
 
   const scheduleSegment = (
     segment: ScheduleQueueItem[],
@@ -658,7 +592,7 @@ export function buildSchedule({
             }
 
             if (isMilestoneItem(currentItem)) {
-              if (usePracticeEveryFourth) {
+              if (useStructuredTrackFlow) {
                 segmentDeferred.push(currentItem);
                 segmentIndex += 1;
                 queueIndex += 1;
@@ -684,7 +618,7 @@ export function buildSchedule({
               continue;
             }
 
-            if (usePracticeEveryFourth) {
+            if (useStructuredTrackFlow) {
               const meetingNumber = bumpTrackMeeting(trackMeetingCounts, trackName);
               if (shouldSchedulePracticeMeeting(sessions, trackName, meetingNumber)) {
                 schedulePracticeSession(
@@ -741,7 +675,7 @@ export function buildSchedule({
     onSegmentComplete(segmentDeferred);
   };
 
-  if (useMultiTrackMichael) {
+  if (useMultiTrackStructured) {
     const segments = splitQueueByTrack(scheduleQueue);
     const periodStart = parseISO(startDate);
 
@@ -758,7 +692,7 @@ export function buildSchedule({
           timeSlots,
           holidayMap,
           isLastSegment,
-          minEndDate,
+          closingMinEndDate,
         );
         if (certDate) {
           blockUntilAfterWeek = getWeekKey(parseISO(certDate));
@@ -809,7 +743,7 @@ export function buildSchedule({
             }
 
             if (isMilestoneItem(currentItem)) {
-              if (usePracticeEveryFourth) {
+              if (useStructuredTrackFlow) {
                 deferredMilestones.push(currentItem);
                 queueIndex += 1;
                 continue;
@@ -833,7 +767,7 @@ export function buildSchedule({
               continue;
             }
 
-            if (usePracticeEveryFourth) {
+            if (useStructuredTrackFlow) {
               const meetingNumber = bumpTrackMeeting(trackMeetingCounts, trackName);
               if (shouldSchedulePracticeMeeting(sessions, trackName, meetingNumber)) {
                 schedulePracticeSession(
@@ -890,8 +824,7 @@ export function buildSchedule({
       current = addDays(current, 1);
     }
 
-    const periodEnd = minEndDate ?? current;
-    if (usePracticeEveryFourth && minEndDate && trackIds.length === 1) {
+    if (useStructuredTrackFlow && trackIds.length === 1) {
       const trackName = TRACKS.find((t) => t.id === trackIds[0])?.name;
       if (trackName) {
         finalizeMichaelTrackSegment(
@@ -902,18 +835,9 @@ export function buildSchedule({
           timeSlots,
           holidayMap,
           true,
-          minEndDate,
+          closingMinEndDate,
         );
       }
-    } else if (usePracticeEveryFourth && deferredMilestones.length > 0) {
-      scheduleDeferredMilestones(
-        sessions,
-        deferredMilestones,
-        parseISO(startDate),
-        periodEnd,
-        timeSlots,
-        holidayMap,
-      );
     }
   }
 
