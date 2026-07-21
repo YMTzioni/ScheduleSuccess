@@ -5,10 +5,20 @@ import aiProData from './courses/Ai Pro.json';
 import cyberData from './courses/Cyber.json';
 import qaData from './courses/QA.json';
 import dataAnalystData from './courses/Data Analyst.json';
+import digitalMarketingPart1Data from '../../Courses/digital marketing1.json';
+import digitalMarketingPart2Data from '../../Courses/digital marketing2.json';
+import devopsData from '../../Courses/devops.json';
 
 interface CourseFile {
   courses: { title: string; lessons: string[] }[];
 }
+
+const digitalMarketingData: CourseFile = {
+  courses: [
+    ...digitalMarketingPart1Data.courses,
+    ...digitalMarketingPart2Data.courses,
+  ],
+};
 
 function fromCourseFile(
   id: string,
@@ -68,6 +78,18 @@ export const TRACKS: Track[] = [
     'מסלול מדעי הנתונים לניתוח עסקי – SQL מתקדם, Python ו-Pandas, Excel ו-Power BI, כולל פרויקט גמר מעשי.',
     dataAnalystData,
     'מדעי הנתונים',
+  ),
+  fromCourseFile(
+    'digital-marketing',
+    'שיווק דיגיטלי',
+    'מסלול מקיף לשיווק דיגיטלי: תוכן וקופי, רשתות חברתיות, קמפיינים ממומנים, משפכי שיווק, אנליטיקה ואסטרטגיה מעשית.',
+    digitalMarketingData,
+  ),
+  fromCourseFile(
+    'devops',
+    'דבאופס',
+    'מסלול DevOps מקיף: Linux, רשתות, אוטומציה, CI/CD, Docker, Kubernetes, ענן וניטור מערכות.',
+    devopsData,
   ),
 ];
 
