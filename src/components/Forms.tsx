@@ -24,10 +24,12 @@ interface StudentFormProps {
   idNumber: string;
   trackIds: string[];
   amountNis: number;
+  introNote: string;
   onFullNameChange: (v: string) => void;
   onIdNumberChange: (v: string) => void;
   onTrackIdsChange: (ids: string[]) => void;
   onAmountChange: (v: number) => void;
+  onIntroNoteChange: (v: string) => void;
 }
 
 export function StudentForm({
@@ -35,10 +37,12 @@ export function StudentForm({
   idNumber,
   trackIds,
   amountNis,
+  introNote,
   onFullNameChange,
   onIdNumberChange,
   onTrackIdsChange,
   onAmountChange,
+  onIntroNoteChange,
 }: StudentFormProps) {
   const addTrack = (id: string) => {
     if (!trackIds.includes(id)) {
@@ -96,6 +100,19 @@ export function StudentForm({
           />
         </label>
       </div>
+
+      <label className="intro-note-field">
+        טקסט חופשי בתחילת המסמך (לא חובה)
+        <textarea
+          value={introNote}
+          onChange={(e) => onIntroNoteChange(e.target.value)}
+          placeholder="לדוגמה: הסטודנט זכאי למפגשי תרגול נוספים ללא עלות."
+          rows={3}
+        />
+        <span className="intro-note-hint">
+          יופיע בעמוד הראשון, מתחת לפרטי הסטודנט. השאר ריק אם אין צורך.
+        </span>
+      </label>
 
       <div className="tracks-section">
         <h3>מסלולי לימוד (לפי סדר)</h3>

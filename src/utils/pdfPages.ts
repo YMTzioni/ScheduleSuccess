@@ -14,14 +14,30 @@ export interface PdfPageContent {
 export interface PdfPageOptions {
   trackCount?: number;
   totalDescriptionChars?: number;
+  introNote?: string;
 }
 
-function getFirstPageMaxRows(trackCount: number, totalDescriptionChars: number): number {
+const INTRO_NOTE_CHARS_PER_LINE = 110;
+
+function countIntroNoteLines(introNote: string): number {
+  if (!introNote) return 0;
+  return introNote
+    .split('\n')
+    .reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / INTRO_NOTE_CHARS_PER_LINE)), 0);
+}
+
+function getFirstPageMaxRows(
+  trackCount: number,
+  totalDescriptionChars: number,
+  introNoteLines: number,
+): number {
   let rows = 11 - trackCount * 2;
   if (totalDescriptionChars > 350) rows -= 2;
   if (totalDescriptionChars > 700) rows -= 2;
   if (totalDescriptionChars > 1200) rows -= 2;
-  return Math.max(5, rows);
+  if (introNoteLines === 0) return Math.max(5, rows);
+  rows -= 1 + Math.ceil(introNoteLines / 2);
+  return Math.max(2, rows);
 }
 
 const CONTINUATION_PAGE_ROWS = 14;
@@ -34,7 +50,11 @@ export function buildPdfPages(
 ): PdfPageContent[] {
   const trackCount = options.trackCount ?? 1;
   const totalDescriptionChars = options.totalDescriptionChars ?? 0;
-  const firstPageMax = getFirstPageMaxRows(trackCount, totalDescriptionChars);
+  const firstPageMax = getFirstPageMaxRows(
+    trackCount,
+    totalDescriptionChars,
+    countIntroNoteLines(options.introNote ?? ''),
+  );
 
   if (sessions.length === 0) {
     return [

@@ -49,6 +49,7 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
     .filter((t): t is (typeof TRACKS)[number] => Boolean(t));
 
   const tracksTitle = formatTracksTitle(selectedTracks);
+  const introNote = document.introNote.trim();
 
   const pdfPages = useMemo(() => {
     const totalDescriptionChars = selectedTracks.reduce(
@@ -58,8 +59,9 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
     return buildPdfPages(document.sessions, {
       trackCount: selectedTracks.length,
       totalDescriptionChars,
+      introNote,
     });
-  }, [document.sessions, document.trackIds]);
+  }, [document.sessions, document.trackIds, introNote]);
 
   const exportPdf = async () => {
     if (!pagesRef.current) return;
@@ -138,6 +140,12 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
                   </span>
                 </div>
               </div>
+            )}
+
+            {page.showStudent && introNote && (
+              <section className="doc-intro-note" data-testid="doc-intro-note">
+                {introNote}
+              </section>
             )}
 
             {page.showTracks && (

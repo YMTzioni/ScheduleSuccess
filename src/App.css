@@ -163,7 +163,8 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -175,7 +176,8 @@ select {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   outline: none;
   border-color: var(--brand);
   box-shadow: 0 0 0 3px rgba(33, 181, 158, 0.2);
@@ -816,6 +818,13 @@ select:focus {
   font-size: 9pt;
 }
 
+.pdf-page .doc-intro-note {
+  margin-bottom: 0.65rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 9pt;
+  line-height: 1.55;
+}
+
 .pdf-page .doc-tracks-intro {
   margin-bottom: 0.65rem;
 }
@@ -1074,6 +1083,39 @@ select:focus {
 .field-value {
   color: #000000;
   font-weight: 500;
+}
+
+.intro-note-field {
+  margin-top: 1rem;
+}
+
+.intro-note-field textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+  line-height: 1.6;
+  border-right: 3px solid var(--brand);
+}
+
+.intro-note-hint {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.doc-intro-note {
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem;
+  background: #f1faf8;
+  border-right: 3px solid var(--brand);
+  border-radius: 6px 0 0 6px;
+  font-size: 9.5pt;
+  font-weight: 500;
+  line-height: 1.6;
+  color: #1a1a1a;
+  white-space: pre-wrap;
+  text-align: justify;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 .doc-tracks-intro {

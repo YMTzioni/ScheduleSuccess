@@ -15,6 +15,7 @@ function App() {
   const [idNumber, setIdNumber] = useState('');
   const [trackIds, setTrackIds] = useState<string[]>([]);
   const [amountNis, setAmountNis] = useState(0);
+  const [introNote, setIntroNote] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDateMode, setEndDateMode] = useState<EndDateMode>('auto');
   const [manualEndDate, setManualEndDate] = useState('');
@@ -83,6 +84,7 @@ function App() {
       idNumber,
       trackIds,
       amountNis,
+      introNote,
       startDate,
       endDate,
       timeSlots,
@@ -90,7 +92,7 @@ function App() {
       documentDate: format(new Date(), 'yyyy-MM-dd'),
       totalLessons,
     }),
-    [fullName, idNumber, trackIds, amountNis, startDate, endDate, timeSlots, sessions, totalLessons],
+    [fullName, idNumber, trackIds, amountNis, introNote, startDate, endDate, timeSlots, sessions, totalLessons],
   );
 
   const hasScheduleInput =
@@ -134,10 +136,12 @@ function App() {
           idNumber={idNumber}
           trackIds={trackIds}
           amountNis={amountNis}
+          introNote={introNote}
           onFullNameChange={setFullName}
           onIdNumberChange={setIdNumber}
           onTrackIdsChange={setTrackIds}
           onAmountChange={setAmountNis}
+          onIntroNoteChange={setIntroNote}
         />
 
         <ScheduleBuilder

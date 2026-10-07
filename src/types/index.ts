@@ -39,6 +39,7 @@ export interface StudentDocument {
   idNumber: string;
   trackIds: string[];
   amountNis: number;
+  introNote: string;
   startDate: string;
   endDate: string;
   timeSlots: TimeSlot[];
