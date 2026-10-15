@@ -8,6 +8,7 @@ import dataAnalystData from './courses/Data Analyst.json';
 import digitalMarketingPart1Data from '../../Courses/digital marketing1.json';
 import digitalMarketingPart2Data from '../../Courses/digital marketing2.json';
 import devopsData from '../../Courses/devops.json';
+import businessManagementData from '../../Courses/business management.json';
 
 interface CourseFile {
   courses: { title: string; lessons: string[] }[];
@@ -90,6 +91,12 @@ export const TRACKS: Track[] = [
     'דבאופס',
     'מסלול DevOps מקיף: Linux, רשתות, אוטומציה, CI/CD, Docker, Kubernetes, ענן וניטור מערכות.',
     devopsData,
+  ),
+  fromCourseFile(
+    'business-management',
+    'מנהל עסקים',
+    'מסלול מקיף לניהול ויזמות עסקית: פתיחת עסק עצמאי, פיתוח עסקי ומכירות, משא ומתן, מנהיגות ועבודת צוות, קבלת החלטות פיננסיות, דיני חוזים ודיני עבודה, תקשורת עסקית ודיבור מול קהל, ועד Excel לניהול העסק.',
+    businessManagementData,
   ),
 ];
 
