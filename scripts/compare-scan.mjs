@@ -27,6 +27,22 @@ const TRACK_FILES = {
   },
   devops: { id: 'devops', files: ['Courses/devops.json'] },
   'מנהלעסקיםחובה': { id: 'business-management', files: ['Courses/business management.json'] },
+  'פיתוח-תוכנה-ואוטומציה-מבוסס-בינה-מלאכותית-ai': { id: 'ai-automation', files: ['Courses/ai automation.json'] },
+  'אסטרטגיות-שיווק-דיגיטלי-מתקדם': {
+    id: 'digital-marketing-advanced',
+    files: ['Courses/digital marketing advanced.json'],
+  },
+  'מנהלעסקיםבחירה': { id: 'enrichment', files: ['Courses/enrichment.json'] },
+  'קורסיאנגלית': { id: 'english', files: ['Courses/english.json'] },
+  'קורסיהייטק-1': { id: 'international-hitech', files: ['Courses/international hitech.json'] },
+  'משפיענירשת': { id: 'influencers', files: ['Courses/influencers.json'] },
+  python: { id: 'python', files: ['Courses/python.json'] },
+  'יזמותנדלן': { id: 'real-estate', files: ['Courses/real estate.json'] },
+  'שוקההוןוקריפטו-1': { id: 'capital-markets', files: ['Courses/capital markets.json'] },
+  net: { id: 'dotnet', files: ['Courses/dotnet.json'] },
+  'פיתוח-ארגוני-בעולם-ההייטק': { id: 'org-development', files: ['Courses/org development.json'] },
+  'מנטורינג-והפתחות-אישית': { id: 'mentoring', files: ['Courses/mentoring.json'] },
+  'לימודי-עברית': { id: 'hebrew', files: ['Courses/hebrew.json'] },
 };
 
 const scanPath = process.argv[2];

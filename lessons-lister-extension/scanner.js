@@ -15,7 +15,7 @@ export async function scanAllTracks() {
     /טופס משוב/i,
     /\bsurvey\b/i,
     /\bquiz\b/i,
-    /\bexam\b/i,
+    /(?<!interview )\bexam\b/i,
     /\btest\b/i,
     /\bpresentation/i,
   ];

@@ -13,7 +13,7 @@ const SKIP_PATTERNS = [
   /טופס משוב/i,
   /\bsurvey\b/i,
   /\bquiz\b/i,
-  /\bexam\b/i,
+  /(?<!interview )\bexam\b/i,
   /\btest\b/i,
   /\bpresentation/i,
 ];
@@ -89,7 +89,7 @@ async function scrapeLessonsOnCurrentPage(tabId) {
       /טופס משוב/i,
       /\bsurvey\b/i,
       /\bquiz\b/i,
-      /\bexam\b/i,
+      /(?<!interview )\bexam\b/i,
       /\btest\b/i,
       /\bpresentation/i,
     ];

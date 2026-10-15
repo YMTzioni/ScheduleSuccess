@@ -11,6 +11,19 @@ import devopsData from '../../Courses/devops.json';
 import businessManagementData from '../../Courses/business management.json';
 import projectManagementData from '../../Courses/project management.json';
 import uiUxData from '../../Courses/ui ux.json';
+import aiAutomationData from '../../Courses/ai automation.json';
+import digitalMarketingAdvancedData from '../../Courses/digital marketing advanced.json';
+import enrichmentData from '../../Courses/enrichment.json';
+import englishData from '../../Courses/english.json';
+import internationalHitechData from '../../Courses/international hitech.json';
+import influencersData from '../../Courses/influencers.json';
+import pythonData from '../../Courses/python.json';
+import realEstateData from '../../Courses/real estate.json';
+import capitalMarketsData from '../../Courses/capital markets.json';
+import dotnetData from '../../Courses/dotnet.json';
+import orgDevelopmentData from '../../Courses/org development.json';
+import mentoringData from '../../Courses/mentoring.json';
+import hebrewData from '../../Courses/hebrew.json';
 
 interface CourseFile {
   courses: { title: string; lessons: string[] }[];
@@ -112,6 +125,85 @@ export const TRACKS: Track[] = [
     'מסלול לעיצוב חוויית משתמש וממשק משתמש: מחקר משתמשים ופרסונות, ארכיטקטורת מידע וזרימות משתמש, Wireframes, עיצוב ממשק ומערכת עיצוב ב-Figma, אנימציות ואב-טיפוס, בדיקות שמישות והעברה לפיתוח, ועד פרויקט גמר.',
     uiUxData,
     'עיצוב חוויית וממשק משתמש',
+  ),  fromCourseFile(
+    'ai-automation',
+    'פיתוח תוכנה ואוטומציה מבוסס AI',
+    'מסלול מעשי לפיתוח תוכנה ואוטומציה בעזרת כלי בינה מלאכותית: עבודה עם Cursor ו-Claude Code לכתיבת קוד, ובניית תהליכי אוטומציה עסקיים ב-N8N.',
+    aiAutomationData,
+  ),
+  fromCourseFile(
+    'digital-marketing-advanced',
+    'אסטרטגיות שיווק דיגיטלי מתקדם',
+    'הכשרה מקיפה ופרקטית בשיווק דיגיטלי: כתיבת תוכן שיווקי, קידום אורגני (SEO) וממומן (PPC) בגוגל, שיווק בפייסבוק, באינסטגרם, בטיקטוק, בטאבולה ובפינטרסט, בוטים וניהול קהילות.',
+    digitalMarketingAdvancedData,
+  ),
+  fromCourseFile(
+    'enrichment',
+    'קורסי העשרה',
+    'מגוון רחב של קורסי העשרה בעולם העסקים, הניהול וההתפתחות האישית: יזמות וחדשנות, כלכלה ופסיכולוגיה, מנהיגות ותקשורת, שיווק ומכירות, חשיבה יצירתית ופיתוח קריירה.',
+    enrichmentData,
+  ),
+  fromCourseFile(
+    'english',
+    'קורסי אנגלית',
+    'השפה האנגלית היא אבן יסוד בעולם העסקי. המסלול כולל אנגלית בסיסית, התקשרות בינלאומית באנגלית ואנגלית לעסקים, עם המושגים החשובים ביותר לאנשי עסקים.',
+    englishData,
+  ),
+  fromCourseFile(
+    'international-hitech',
+    'קורסי הייטק בינלאומיים',
+    'קורסי הייטק ממוסדות בינלאומיים: מסדי נתונים ו-SQL ברמות מתקדמות, מבוא למדעי המחשב, תכנות בפייתון ו-Scratch, בינה מלאכותית, פיתוח אפליקציות לנייד ב-React Native ויסודות פיתוח תוכנה.',
+    internationalHitechData,
+  ),
+  fromCourseFile(
+    'influencers',
+    'משפיעני רשת',
+    'מסלול שמכשיר צעד אחר צעד לעולם המשפיענים ומובילי הדעה: מודלים עסקיים, עבודה באינסטגרם, בפייסבוק, בטיקטוק וביוטיוב, עבודת משפיענים בשטח והסמכות Google Ads.',
+    influencersData,
+  ),
+  fromCourseFile(
+    'python',
+    'Python',
+    'מסלול מקיף ללימוד שפת Python, שפת התכנות הפופולרית בעולם: יסודות השפה, רשתות מחשבים, Python מתקדם, תכנות מונחה עצמים (OOP) ועבודה עם נתונים.',
+    pythonData,
+    'תכנות ופיתוח',
+  ),
+  fromCourseFile(
+    'real-estate',
+    'יזמות נדל"ן',
+    'מסלול ליזמות והשקעות נדל"ן: היבטים משפטיים ותכנוניים, איך לגשת לעסקת נדל"ן ולהרוויח מהשקעות, הכנה למבחן רשם המתווכים וייעוץ משכנתאות.',
+    realEstateData,
+  ),
+  fromCourseFile(
+    'capital-markets',
+    'שוק ההון וקריפטו',
+    "כלים לניהול תיק השקעות באופן עצמאי: ניתוח פונדמנטלי וטכני של חברות בבורסה האמריקאית, מסחר באופציות, ועולם הקריפטו והבלוקצ'יין.",
+    capitalMarketsData,
+  ),
+  fromCourseFile(
+    'dotnet',
+    '.NET',
+    'יסודות תכנות מונחה עצמים בסביבת ‎.NET ובשפת C#‎: מבוא ויסודות, OOP, ‎.NET מתקדם, רשתות מחשבים, עבודה עם מסדי נתונים, WinForms והכנה לקריירה.',
+    dotnetData,
+    'תכנות ופיתוח',
+  ),
+  fromCourseFile(
+    'org-development',
+    'פיתוח ארגוני בעולם ההייטק',
+    "כלים וידע לפיתוח ארגונים בעולם הטכנולוגי המשתנה במהירות: אג'ייל צוותי והארגון האג'ילי, ניהול פרויקטים, כישורי ניהול ומנהיגות והתפתחות אישית.",
+    orgDevelopmentData,
+  ),
+  fromCourseFile(
+    'mentoring',
+    'מנטורינג והתפתחות אישית',
+    "מסלול בשיטת NLP ברמות Practitioner ו-Master, קואצ'ינג והנחיית קבוצות, לפיתוח אישי וליווי אחרים.",
+    mentoringData,
+  ),
+  fromCourseFile(
+    'hebrew',
+    'לימודי עברית',
+    'לימוד עברית בסיסית בקצב ובשעות שנוחים לכם — עברית כמפתח לתקשורת ולהצלחה.',
+    hebrewData,
   ),
 ];
 
