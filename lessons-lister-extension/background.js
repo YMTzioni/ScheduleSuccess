@@ -89,7 +89,8 @@ async function scrapeLessonsOnCurrentPage(tabId) {
       /\bpresentation/i,
     ];
 
-    const normalize = (text) => text.replace(/\s+/g, ' ').trim();
+    const normalize = (text) =>
+      text.replace(/\s+/g, ' ').trim().replace(/\.(mp4|mov|m4v|mkv|webm|avi)$/i, '');
     const shouldSkip = (text) => skipPatterns.some((regex) => regex.test(normalize(text)));
 
     const menusRoot = document.querySelector('#menus');

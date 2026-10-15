@@ -1,0 +1,66 @@
+{
+  "exportedAt": "2026-10-15T08:07:48.306Z",
+  "courses": [
+    {
+      "lessons": [
+        "Intro to UX/UI - Part 1",
+        "Intro to UX/UI - Part 2",
+        "Intro to Figma",
+        "UX Design"
+      ],
+      "title": "יסודות ה-UX/UI"
+    },
+    {
+      "lessons": [
+        "Research",
+        "Personas",
+        "User Mapping",
+        "Useful Tools"
+      ],
+      "title": "UI UX - מחקר משתמשים ואסטרטגיית מוצר"
+    },
+    {
+      "lessons": [
+        "Flow Chart",
+        "Wireframes",
+        "Low Fidelity"
+      ],
+      "title": "UI UX - ארכיטקטורת מידע, זרימות משתמש ו-Wireframes"
+    },
+    {
+      "lessons": [
+        "Intro to UI",
+        "Style Guide - Part 1",
+        "Style Guide - Part 2",
+        "Components",
+        "Buttons"
+      ],
+      "title": "UI UX - עיצוב ממשק משתמש (UI) ומערכת עיצוב"
+    },
+    {
+      "lessons": [
+        "Animations",
+        "Prototype"
+      ],
+      "title": "UI UX - אינטראקציות ואב-טיפוס"
+    },
+    {
+      "lessons": [
+        "Usability Testing",
+        "Dev Mode"
+      ],
+      "title": "UI UX - בדיקות משתמשים והעברה לפיתוח"
+    },
+    {
+      "lessons": [
+        "Final Project"
+      ],
+      "title": "UI UX - פרויקט גמר"
+    }
+  ],
+  "debug": {
+    "discoveredLinks": 7,
+    "visited": 7,
+    "skippedNoLessons": 0
+  }
+}

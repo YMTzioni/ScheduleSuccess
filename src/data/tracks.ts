@@ -10,6 +10,7 @@ import digitalMarketingPart2Data from '../../Courses/digital marketing2.json';
 import devopsData from '../../Courses/devops.json';
 import businessManagementData from '../../Courses/business management.json';
 import projectManagementData from '../../Courses/project management.json';
+import uiUxData from '../../Courses/ui ux.json';
 
 interface CourseFile {
   courses: { title: string; lessons: string[] }[];
@@ -104,6 +105,13 @@ export const TRACKS: Track[] = [
     'ניהול פרויקטים',
     'מסלול מעשי לניהול פרויקטים: אפיון והגדרת מטרות, תכנון פרויקט, מתודולוגיות Waterfall, Agile ו-Hybrid, ניהול תקשורת בארגון, ניהול סיכונים ושינויים ובקרת איכות, עם תרגול מעשי בכל שלב.',
     projectManagementData,
+  ),
+  fromCourseFile(
+    'ui-ux',
+    'UI UX',
+    'מסלול לעיצוב חוויית משתמש וממשק משתמש: מחקר משתמשים ופרסונות, ארכיטקטורת מידע וזרימות משתמש, Wireframes, עיצוב ממשק ומערכת עיצוב ב-Figma, אנימציות ואב-טיפוס, בדיקות שמישות והעברה לפיתוח, ועד פרויקט גמר.',
+    uiUxData,
+    'עיצוב חוויית וממשק משתמש',
   ),
 ];
 
