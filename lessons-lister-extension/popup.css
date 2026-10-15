@@ -5,7 +5,6 @@ body {
 }
 
 .container {
-  width: 360px;
   padding: 12px;
   box-sizing: border-box;
 }
@@ -59,4 +58,88 @@ textarea {
   font-size: 12px;
   font-family: Consolas, monospace;
   background: white;
+}
+
+.container {
+  width: 420px;
+}
+
+.report {
+  margin-bottom: 12px;
+}
+
+.report-summary {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.report-summary.ok {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.report-summary.warn {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.problems {
+  margin: 0 0 8px;
+  padding-inline-start: 18px;
+  font-size: 12px;
+  color: #92400e;
+}
+
+.problems:empty {
+  display: none;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  background: white;
+}
+
+.report-table th,
+.report-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: start;
+}
+
+.report-table th {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.report-table td.bad {
+  color: #b91c1c;
+  font-weight: bold;
+}
+
+details.excluded,
+details.page-scan {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+details summary {
+  cursor: pointer;
+  color: #0f766e;
+}
+
+details.excluded ul {
+  max-height: 160px;
+  overflow-y: auto;
+  margin: 4px 0;
+  padding-inline-start: 18px;
+  color: #475569;
+}
+
+details.page-scan textarea {
+  margin-top: 8px;
 }

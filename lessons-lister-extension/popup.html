@@ -10,21 +10,41 @@
     <main class="container">
       <h1>Lessons Lister</h1>
       <p class="hint">
-        פתח את דף הקורסים ולחץ על "סרוק עכשיו". התוסף יעבור קורס-קורס ויחלץ את רשימת
-        השיעורים.
+        סריקה מלאה עוברת על כל המסלולים באתר, על כל הקורסים בכל מסלול ועל כל השיעורים,
+        ובסוף מציגה דוח בדיקה.
       </p>
 
-      <button id="scanBtn" type="button">סרוק עכשיו</button>
+      <button id="scanAllBtn" type="button">סרוק את כל המסלולים</button>
       <p id="status" class="status">מוכן לסריקה</p>
 
-      <textarea
-        id="output"
-        readonly
-        placeholder="כאן תופיע רשימת השיעורים..."
-      ></textarea>
+      <section id="report" class="report" hidden>
+        <p id="reportSummary" class="report-summary"></p>
+        <ul id="problems" class="problems"></ul>
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>מסלול</th>
+              <th>קורסים</th>
+              <th>שיעורים</th>
+              <th>סוננו</th>
+            </tr>
+          </thead>
+          <tbody id="reportRows"></tbody>
+        </table>
+        <div id="excludedDetails"></div>
+        <button id="downloadAllBtn" type="button" class="secondary">הורד JSON של כל המסלולים</button>
+      </section>
 
-      <button id="copyBtn" type="button" class="secondary">העתק רשימה</button>
-      <button id="downloadJsonBtn" type="button" class="secondary">הורד JSON</button>
+      <details class="page-scan">
+        <summary>סריקת העמוד הנוכחי בלבד</summary>
+        <p class="hint">
+          למסלול שלא מופיע ברשימה הציבורית: פתח את דף המסלול כשאתה מחובר ולחץ כאן.
+        </p>
+        <button id="scanBtn" type="button" class="secondary">סרוק עמוד נוכחי</button>
+        <textarea id="output" readonly placeholder="כאן תופיע רשימת השיעורים..."></textarea>
+        <button id="copyBtn" type="button" class="secondary">העתק רשימה</button>
+        <button id="downloadJsonBtn" type="button" class="secondary">הורד JSON</button>
+      </details>
     </main>
     <script src="popup.js" type="module"></script>
   </body>

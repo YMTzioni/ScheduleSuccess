@@ -1,3 +1,6 @@
+import { scanAllTracks } from './scanner.js';
+
+const SITE_ORIGIN = 'https://login.successcollege.co.il';
 const WAIT_AFTER_NAVIGATION_MS = 1200;
 
 const SKIP_PATTERNS = [
@@ -10,6 +13,7 @@ const SKIP_PATTERNS = [
   /טופס משוב/i,
   /\bsurvey\b/i,
   /\bquiz\b/i,
+  /\bexam\b/i,
   /\btest\b/i,
   /\bpresentation/i,
 ];
@@ -85,6 +89,7 @@ async function scrapeLessonsOnCurrentPage(tabId) {
       /טופס משוב/i,
       /\bsurvey\b/i,
       /\bquiz\b/i,
+      /\bexam\b/i,
       /\btest\b/i,
       /\bpresentation/i,
     ];
@@ -158,17 +163,47 @@ async function scanAllCourses(tabId, startUrl) {
   return { courses, debug };
 }
 
+// The API calls must come from a page on the college's site, so the scan
+// runs inside a tab there — the active one if it is already on the site.
+async function scanEverything(tabId) {
+  const tab = await chrome.tabs.get(tabId);
+  if (!tab.url?.startsWith(SITE_ORIGIN)) {
+    await chrome.tabs.update(tabId, { url: `${SITE_ORIGIN}/bundles` });
+    await waitForTabComplete(tabId);
+  }
+
+  const [result] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: scanAllTracks,
+  });
+  if (!result?.result) throw new Error('הסריקה לא החזירה תוצאה.');
+
+  await chrome.storage.local.set({ lastFullScan: result.result });
+  return result.result;
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== 'START_SCAN') return;
+  if (message?.type === 'START_SCAN') {
+    (async () => {
+      try {
+        const data = await scanAllCourses(message.tabId, message.startUrl);
+        sendResponse({ ok: true, data });
+      } catch (error) {
+        sendResponse({ ok: false, error: error.message || 'שגיאה בהרצת הסריקה' });
+      }
+    })();
+    return true;
+  }
 
-  (async () => {
-    try {
-      const data = await scanAllCourses(message.tabId, message.startUrl);
-      sendResponse({ ok: true, data });
-    } catch (error) {
-      sendResponse({ ok: false, error: error.message || 'שגיאה בהרצת הסריקה' });
-    }
-  })();
-
-  return true;
+  if (message?.type === 'START_FULL_SCAN') {
+    (async () => {
+      try {
+        const data = await scanEverything(message.tabId);
+        sendResponse({ ok: true, data });
+      } catch (error) {
+        sendResponse({ ok: false, error: error.message || 'שגיאה בהרצת הסריקה' });
+      }
+    })();
+    return true;
+  }
 });
