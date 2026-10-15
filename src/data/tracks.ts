@@ -9,6 +9,7 @@ import digitalMarketingPart1Data from '../../Courses/digital marketing1.json';
 import digitalMarketingPart2Data from '../../Courses/digital marketing2.json';
 import devopsData from '../../Courses/devops.json';
 import businessManagementData from '../../Courses/business management.json';
+import projectManagementData from '../../Courses/project management.json';
 
 interface CourseFile {
   courses: { title: string; lessons: string[] }[];
@@ -97,6 +98,12 @@ export const TRACKS: Track[] = [
     'מנהל עסקים',
     'מסלול מקיף לניהול ויזמות עסקית: פתיחת עסק עצמאי, פיתוח עסקי ומכירות, משא ומתן, מנהיגות ועבודת צוות, קבלת החלטות פיננסיות, דיני חוזים ודיני עבודה, תקשורת עסקית ודיבור מול קהל, ועד Excel לניהול העסק.',
     businessManagementData,
+  ),
+  fromCourseFile(
+    'project-management',
+    'ניהול פרויקטים',
+    'מסלול מעשי לניהול פרויקטים: אפיון והגדרת מטרות, תכנון פרויקט, מתודולוגיות Waterfall, Agile ו-Hybrid, ניהול תקשורת בארגון, ניהול סיכונים ושינויים ובקרת איכות, עם תרגול מעשי בכל שלב.',
+    projectManagementData,
   ),
 ];
 
