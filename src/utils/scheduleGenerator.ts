@@ -10,7 +10,7 @@ import {
 
 export const FINAL_EXAM_TITLE = 'מבחן סיום';
 export const CERTIFICATE_TITLE = 'חלוקת תעודות';
-export const PRACTICE_TITLE = 'תרגול';
+export const PRACTICE_TITLE = 'תרגול ב-Google Meet';
 export const PROJECT_BUILDING_TITLE = 'בניית פרויקטים';
 export const PROJECT_PRESENTATION_TITLE = 'הצגת פרויקטים';
 const PRACTICE_EVERY_N_MEETINGS = 4;

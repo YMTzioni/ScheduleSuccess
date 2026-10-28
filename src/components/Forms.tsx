@@ -482,7 +482,7 @@ export function ScheduleBuilder({
         <div className="recommendation-panel recommendation-ok template-structured-panel">
           <strong>מבנה לוז מובנה</strong>
           <ul>
-            <li>תרגול — כל מפגש רביעי, ללא שני מפגשי תרגול רצופים</li>
+            <li>תרגול ב-Google Meet — כל מפגש רביעי, ללא שני מפגשי תרגול רצופים</li>
             <li>השלמת מסלול: בניית פרויקטים (עד 5) + הצגת פרויקטים (מפגש 1)</li>
             <li>סיום כל מסלול: מבחן סיום ואחריו חלוקת תעודות</li>
             {trackIds.length > 1 &&
