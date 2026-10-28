@@ -298,6 +298,9 @@ export function ScheduleBuilder({
       return;
     }
 
+    // Only the manual planner derives the slots from the period, so only it
+    // starts over; days and hours chosen by hand stay when a track is added.
+    if (endDateMode !== 'manual') return;
     setDistributionApplied(false);
     setSelectedOptionId(null);
     onTimeSlotsChange([]);
@@ -390,6 +393,9 @@ export function ScheduleBuilder({
       return;
     }
     onEndDateModeChange(mode);
+    // Hand-picked days and hours carry over between automatic and fixed;
+    // the manual planner proposes its own.
+    if (mode !== 'manual' && endDateMode !== 'manual') return;
     onTimeSlotsChange([]);
     setDistributionApplied(false);
     setSelectedOptionId(null);
@@ -784,7 +790,7 @@ export function ScheduleBuilder({
         </div>
       )}
 
-      {(endDateMode === 'auto' || distributionApplied) && showSlotBuilder && (
+      {showSlotBuilder && (
         <>
           <div className="slot-builder">
             <h3>
