@@ -1264,3 +1264,20 @@ textarea:focus {
     gap: 1rem;
   }
 }
+
+/* Off-screen copy of the document, laid out only to measure row heights. */
+.pdf-measure {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media print {
+  .pdf-measure {
+    display: none !important;
+  }
+}

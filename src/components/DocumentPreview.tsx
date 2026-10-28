@@ -1,9 +1,14 @@
-import { useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 import type { StudentDocument } from '../types';
 import { TRACKS } from '../data/tracks';
-import { buildPdfPages } from '../utils/pdfPages';
+import {
+  buildMeasuredPdfPages,
+  buildPdfPages,
+  type PageMetrics,
+  type PdfPageContent,
+} from '../utils/pdfPages';
 import { exportPagesToPdf } from '../utils/pdfExport';
 import { PrintScheduleTable } from './PrintScheduleTable';
 import logoUrl from '../assets/logo.png';
@@ -51,7 +56,10 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
   const tracksTitle = formatTracksTitle(selectedTracks);
   const introNote = document.introNote.trim();
 
-  const pdfPages = useMemo(() => {
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [metrics, setMetrics] = useState<PageMetrics | null>(null);
+
+  const estimatedPages = useMemo(() => {
     const totalDescriptionChars = selectedTracks.reduce(
       (sum, track) => sum + track.description.length,
       0,
@@ -62,6 +70,61 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
       introNote,
     });
   }, [document.sessions, document.trackIds, introNote]);
+
+  const pdfPages = useMemo(
+    () => (metrics ? buildMeasuredPdfPages(document.sessions, metrics) : estimatedPages),
+    [metrics, document.sessions, estimatedPages],
+  );
+
+  // Lay the whole document out once, off screen, and measure it: where the
+  // rows start on a first and on a continuation page, every row's height and
+  // every listed lesson's height. Re-measured whenever that layout changes
+  // size (content, fonts, the logo loading).
+  const measure = useCallback(() => {
+    const root = measureRef.current;
+    if (!root) return;
+    const [firstPage, continuationPage] = Array.from(root.querySelectorAll<HTMLElement>('.pdf-page'));
+    const firstBody = firstPage?.querySelector('tbody');
+    const continuationBody = continuationPage?.querySelector('tbody');
+    if (!firstPage || !firstBody || !continuationPage || !continuationBody) return;
+
+    const top = (el: Element, page: HTMLElement) =>
+      el.getBoundingClientRect().top - page.getBoundingClientRect().top;
+    const footer = firstPage.querySelector<HTMLElement>('.doc-signature-footer');
+    const footerStyle = footer ? getComputedStyle(footer) : null;
+    const pageStyle = getComputedStyle(firstPage);
+    const mmToPx = firstPage.getBoundingClientRect().width / 210;
+
+    setMetrics({
+      // A4 is 297mm; keep a margin for print, which lays the page out narrower.
+      pageHeight: 297 * mmToPx * 0.9,
+      firstStart: top(firstBody, firstPage),
+      continuationStart: top(continuationBody, continuationPage),
+      bottomPadding: parseFloat(pageStyle.paddingBottom) || 0,
+      signatureHeight: footer
+        ? footer.getBoundingClientRect().height + (parseFloat(footerStyle!.marginTop) || 0)
+        : 0,
+      rows: Array.from(firstBody.rows).map((row) => ({
+        height: row.getBoundingClientRect().height,
+        lessonHeights: Array.from(row.querySelectorAll('li')).map(
+          (li) => li.getBoundingClientRect().height,
+        ),
+      })),
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    setMetrics(null);
+    measure();
+  }, [measure, document]);
+
+  useEffect(() => {
+    const root = measureRef.current;
+    if (!root || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => measure());
+    root.querySelectorAll('.pdf-page').forEach((page) => observer.observe(page));
+    return () => observer.disconnect();
+  }, [measure]);
 
   const exportPdf = async () => {
     if (!pagesRef.current) return;
@@ -74,31 +137,12 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
     await exportPagesToPdf(pageElements, fileName);
   };
 
-  if (!document.fullName && !document.sessions.length) {
-    return null;
-  }
-
-  return (
-    <section className="card preview-section">
-      <div className="preview-header">
-        <h2>תצוגה מקדימה – מסמך להדפסה (A4)</h2>
-        <div className="preview-actions">
-          <button type="button" className="btn btn-secondary" onClick={() => window.print()}>
-            הדפסה
-          </button>
-          <button type="button" className="btn btn-primary" onClick={exportPdf}>
-            הורד PDF
-          </button>
-        </div>
-      </div>
-
-      <div className="pdf-pages-container" ref={pagesRef} data-testid="pdf-pages-container">
-        {pdfPages.map((page, pageIndex) => (
+  const renderPage = (page: PdfPageContent, pageIndex: number, testId = true) => (
           <div
             key={pageIndex}
             className={`pdf-page${page.showCompactHeader ? ' pdf-page-continuation' : ''}`}
             dir="rtl"
-            data-testid={`pdf-page-${pageIndex}`}
+            data-testid={testId ? `pdf-page-${pageIndex}` : undefined}
           >
             <div className="pdf-page-accent" aria-hidden="true" />
 
@@ -197,7 +241,59 @@ export function DocumentPreview({ document }: DocumentPreviewProps) {
             )}
             </div>
           </div>
-        ))}
+  );
+
+  if (!document.fullName && !document.sessions.length) {
+    return null;
+  }
+
+  return (
+    <section className="card preview-section">
+      <div className="preview-header">
+        <h2>תצוגה מקדימה – מסמך להדפסה (A4)</h2>
+        <div className="preview-actions">
+          <button type="button" className="btn btn-secondary" onClick={() => window.print()}>
+            הדפסה
+          </button>
+          <button type="button" className="btn btn-primary" onClick={exportPdf}>
+            הורד PDF
+          </button>
+        </div>
+      </div>
+
+      <div className="pdf-pages-container" ref={pagesRef} data-testid="pdf-pages-container">
+        {pdfPages.map((page, pageIndex) => renderPage(page, pageIndex))}
+      </div>
+
+      <div className="pdf-measure" ref={measureRef} aria-hidden="true">
+        {renderPage(
+          {
+            showHeader: true,
+            showCompactHeader: false,
+            showStudent: true,
+            showTracks: true,
+            sessions: document.sessions,
+            showScheduleTitle: true,
+            showTableHeader: true,
+            showSignature: true,
+          },
+          0,
+          false,
+        )}
+        {renderPage(
+          {
+            showHeader: false,
+            showCompactHeader: true,
+            showStudent: false,
+            showTracks: false,
+            sessions: document.sessions.slice(0, 1),
+            showScheduleTitle: false,
+            showTableHeader: true,
+            showSignature: false,
+          },
+          1,
+          false,
+        )}
       </div>
     </section>
   );

@@ -1,5 +1,5 @@
 import { addDays, addYears, format, isAfter, parseISO } from 'date-fns';
-import type { EndDateMode, ScheduledSession, TimeSlot } from '../types';
+import type { EndDateMode, LessonItem, ScheduledSession, TimeSlot } from '../types';
 import { TRACKS, getTotalLessonCount } from '../data/tracks';
 import { getIsraeliHolidays, isStudyDay } from './holidays';
 
@@ -300,6 +300,8 @@ export interface ScheduleResult {
   fitsCompletely: boolean;
   periodCapacity: number;
   meetingCount: number;
+  // Fixed-period mode only: the most lessons placed in a single meeting.
+  maxLessonsPerMeeting?: number;
 }
 
 function parseMinutes(time: string): number {
@@ -507,6 +509,11 @@ export function buildSchedule({
 
   if (totalLessons === 0) {
     return { ...empty, endDate: startDate, totalLessons: 0, fitsCompletely: true };
+  }
+
+  if (endDateMode === 'fixed') {
+    if (!manualEndDate || manualEndDate < startDate) return { ...empty, totalLessons };
+    return buildFixedPeriodSchedule(trackIds, startDate, manualEndDate, timeSlots);
   }
 
   const isManual = endDateMode === 'manual';
@@ -866,6 +873,188 @@ export function buildSchedule({
     fitsCompletely: queueIndex >= totalScheduleItems,
     periodCapacity: isManual ? periodCapacity : queueIndex,
     meetingCount: isManual ? meetingCount : finalSessions.length,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Fixed period: the dates are given and every lesson of every track goes in.
+// The meetings in the period are shared between the tracks in proportion to
+// their lessons, tracks run one after another, and inside a track the lessons
+// are split as evenly as possible over its teaching meetings — so a meeting
+// may hold more lessons than it has hours. Each track keeps the structure of
+// the other modes: practice about every fourth meeting, project building,
+// a project presentation, the final exam and the certificates.
+// ---------------------------------------------------------------------------
+
+const FIXED_PRACTICE_EVERY = PRACTICE_EVERY_N_MEETINGS;
+const FIXED_MEETINGS_PER_BUILDING_SESSION = 10;
+const FIXED_MIN_MEETINGS_PER_TRACK = 4;
+
+function evenChunks<T>(items: T[], parts: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < parts; i += 1) {
+    const from = Math.floor((i * items.length) / parts);
+    const to = Math.floor(((i + 1) * items.length) / parts);
+    chunks.push(items.slice(from, to));
+  }
+  return chunks;
+}
+
+// Shares `total` meetings between tracks by weight, each track getting at
+// least `floor` where the total allows (largest-remainder rounding).
+function shareMeetings(total: number, weights: number[]): number[] {
+  const count = weights.length;
+  if (total < count) return weights.map((_, i) => (i < total ? 1 : 0));
+
+  const floor = Math.min(FIXED_MIN_MEETINGS_PER_TRACK, Math.floor(total / count));
+  const shares = weights.map(() => floor);
+  const rest = total - floor * count;
+  const weightSum = weights.reduce((sum, w) => sum + w, 0) || count;
+  const exact = weights.map((w) => (rest * (w || 1)) / weightSum);
+  exact.forEach((value, i) => {
+    shares[i] += Math.floor(value);
+  });
+  let left = total - shares.reduce((sum, s) => sum + s, 0);
+  const byRemainder = exact
+    .map((value, i) => ({ i, r: value - Math.floor(value) }))
+    .sort((a, b) => b.r - a.r);
+  for (const { i } of byRemainder) {
+    if (left <= 0) break;
+    shares[i] += 1;
+    left -= 1;
+  }
+  return shares;
+}
+
+// Positions (0-based, within `length` teaching meetings) for `count` practice
+// meetings, spread evenly and never the first meeting.
+function spreadPositions(length: number, count: number): Set<number> {
+  const picked = new Set<number>();
+  for (let j = 1; j <= count; j += 1) {
+    let position = Math.round((j * length) / (count + 1));
+    position = Math.min(Math.max(position, 1), length - 1);
+    while (picked.has(position) && position < length - 1) position += 1;
+    while (picked.has(position) && position > 1) position -= 1;
+    picked.add(position);
+  }
+  return picked;
+}
+
+function planTrackMeetings(
+  slots: MeetingSlot[],
+  lessons: string[],
+  trackName: string,
+): ScheduledSession[] {
+  const item = (title: string): LessonItem => ({ title, trackName });
+  const session = (slot: MeetingSlot, lessonItems: LessonItem[]): ScheduledSession => ({
+    date: slot.date,
+    dayOfWeek: slot.dayOfWeek,
+    startTime: slot.startTime,
+    endTime: slot.endTime,
+    lessonItems,
+  });
+  const lessonItems = lessons.map(item);
+  const total = slots.length;
+  if (total === 0) return [];
+  if (total === 1) {
+    return [session(slots[0], [...lessonItems, item(FINAL_EXAM_TITLE), item(CERTIFICATE_TITLE)])];
+  }
+
+  // The closing meetings, from the end of the track's share.
+  let tail: LessonItem[][];
+  if (total >= 4) tail = [[item(PROJECT_PRESENTATION_TITLE)], [item(FINAL_EXAM_TITLE)], [item(CERTIFICATE_TITLE)]];
+  else if (total === 3) tail = [[item(FINAL_EXAM_TITLE)], [item(CERTIFICATE_TITLE)]];
+  else tail = [[item(FINAL_EXAM_TITLE), item(CERTIFICATE_TITLE)]];
+
+  const beforeTail = total - tail.length;
+  const building = Math.min(
+    MAX_PROJECT_BUILDING_SESSIONS,
+    Math.floor(beforeTail / FIXED_MEETINGS_PER_BUILDING_SESSION),
+  );
+  const teaching = beforeTail - building;
+
+  // Practice about every fourth meeting; when the track has more meetings
+  // than lessons, every meeting without a lesson becomes practice.
+  let practice = Math.floor(teaching / FIXED_PRACTICE_EVERY);
+  if (lessonItems.length < teaching - practice) practice = teaching - lessonItems.length;
+  practice = Math.max(0, Math.min(practice, teaching - 1));
+  const practiceAt = spreadPositions(teaching, practice);
+  const lessonChunks = evenChunks(lessonItems, teaching - practiceAt.size);
+
+  const sessions: ScheduledSession[] = [];
+  let chunk = 0;
+  for (let i = 0; i < teaching; i += 1) {
+    sessions.push(
+      session(slots[i], practiceAt.has(i) ? [item(PRACTICE_TITLE)] : lessonChunks[chunk++]),
+    );
+  }
+  for (let i = 0; i < building; i += 1) {
+    sessions.push(session(slots[teaching + i], [item(PROJECT_BUILDING_TITLE)]));
+  }
+  tail.forEach((items, i) => sessions.push(session(slots[beforeTail + i], items)));
+  return sessions;
+}
+
+function buildFixedPeriodSchedule(
+  trackIds: string[],
+  startDate: string,
+  endDate: string,
+  timeSlots: TimeSlot[],
+): ScheduleResult {
+  const holidayMap = getIsraeliHolidays(startDate, endDate);
+  const start = parseISO(startDate);
+  const end = parseISO(endDate);
+  const meetings = collectValidMeetingSlots(start, end, timeSlots, holidayMap);
+
+  const skippedDays: { date: string; reason: string }[] = [];
+  for (let day = start; !isAfter(day, end); day = addDays(day, 1)) {
+    if (!timeSlots.some((s) => s.dayOfWeek === day.getDay())) continue;
+    const { allowed, reason } = isStudyDay(day, holidayMap);
+    if (!allowed && reason) skippedDays.push({ date: format(day, 'yyyy-MM-dd'), reason });
+  }
+
+  const tracks = trackIds
+    .map((id) => TRACKS.find((t) => t.id === id))
+    .filter((t): t is (typeof TRACKS)[number] => Boolean(t))
+    .map((t) => ({ name: t.name, lessons: t.modules.flatMap((m) => m.lessons) }));
+  const totalLessons = tracks.reduce((sum, t) => sum + t.lessons.length, 0);
+
+  const shares = shareMeetings(
+    meetings.length,
+    tracks.map((t) => t.lessons.length),
+  );
+  const sessions: ScheduledSession[] = [];
+  let assigned = 0;
+  let offset = 0;
+  tracks.forEach((track, i) => {
+    const slots = meetings.slice(offset, offset + shares[i]);
+    offset += shares[i];
+    if (!slots.length) return;
+    sessions.push(...planTrackMeetings(slots, track.lessons, track.name));
+    assigned += track.lessons.length + 2;
+  });
+
+  const maxLessonsPerMeeting = sessions.reduce(
+    (max, s) =>
+      Math.max(
+        max,
+        s.lessonItems.filter(
+          (it) => !isMilestoneTitle(it.title) && !isPracticeTitle(it.title) && !isSupplementaryTitle(it.title),
+        ).length,
+      ),
+    0,
+  );
+
+  return {
+    sessions,
+    endDate,
+    skippedDays,
+    totalLessons,
+    assignedLessons: assigned,
+    fitsCompletely: assigned === totalLessons + tracks.length * 2,
+    periodCapacity: meetings.length,
+    meetingCount: meetings.length,
+    maxLessonsPerMeeting,
   };
 }
 

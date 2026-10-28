@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { StudentForm, ScheduleBuilder } from './components/Forms';
 import { DocumentPreview } from './components/DocumentPreview';
-import { buildSchedule, countScheduledLessons } from './utils/scheduleGenerator';
+import {
+  buildSchedule,
+  countScheduledLessons,
+  type ScheduleResult,
+} from './utils/scheduleGenerator';
 import { getScheduleFitStatus } from './utils/scheduleRecommendations';
 import { getTotalLessonCount } from './data/tracks';
 import { getScheduleTemplate } from './utils/scheduleTemplates';
@@ -23,7 +27,7 @@ function App() {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [showDocument, setShowDocument] = useState(false);
 
-  const scheduleResult = useMemo(() => {
+  const scheduleResult = useMemo((): ScheduleResult => {
     if (!startDate || !trackIds.length || !timeSlots.length) {
       return {
         sessions: [],
@@ -41,7 +45,7 @@ function App() {
       startDate,
       timeSlots,
       endDateMode,
-      manualEndDate: endDateMode === 'manual' ? manualEndDate : undefined,
+      manualEndDate: endDateMode === 'auto' ? undefined : manualEndDate,
       minimumPeriodYears: getScheduleTemplate(scheduleTemplateId).periodYears,
       structuredTrackFlow: getScheduleTemplate(scheduleTemplateId).structuredTrackFlow,
     });
@@ -149,6 +153,14 @@ function App() {
           endDateMode={endDateMode}
           manualEndDate={manualEndDate}
           calculatedEndDate={endDate}
+          fixedPeriod={
+            endDateMode === 'fixed' && sessions.length
+              ? {
+                  meetings: scheduleResult.meetingCount,
+                  maxLessonsPerMeeting: scheduleResult.maxLessonsPerMeeting ?? 0,
+                }
+              : null
+          }
           trackIds={trackIds}
           scheduleTemplateId={scheduleTemplateId}
           timeSlots={timeSlots}
@@ -168,7 +180,12 @@ function App() {
               {' · '}
               <strong>{sessions.length}</strong> מפגשים ·{' '}
               <strong>{scheduledLessons}</strong>/{totalLessons} שיעורים
-              {!fitsCompletely && endDateMode === 'manual' && (
+              {endDateMode === 'fixed' && scheduleResult.maxLessonsPerMeeting ? (
+                <>
+                  {' · '}עד <strong>{scheduleResult.maxLessonsPerMeeting}</strong> שיעורים במפגש
+                </>
+              ) : null}
+              {!fitsCompletely && endDateMode !== 'auto' && (
                 <span className="summary-warning"> (לא הושלם)</span>
               )}
             </span>

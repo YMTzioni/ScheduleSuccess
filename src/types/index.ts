@@ -17,7 +17,11 @@ export interface TimeSlot {
   endTime: string;
 }
 
-export type EndDateMode = 'auto' | 'manual';
+// auto: the end date follows from the lessons.
+// manual: the period ends on a chosen date; what does not fit is left out.
+// fixed: the period is fixed and every lesson of every track is spread over
+// it, however many lessons that puts in one meeting.
+export type EndDateMode = 'auto' | 'manual' | 'fixed';
 
 export type ScheduleTemplateId = 'custom' | 'michael';
 

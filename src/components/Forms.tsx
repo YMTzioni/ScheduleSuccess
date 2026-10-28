@@ -200,6 +200,7 @@ interface ScheduleBuilderProps {
   endDateMode: EndDateMode;
   manualEndDate: string;
   calculatedEndDate: string;
+  fixedPeriod: { meetings: number; maxLessonsPerMeeting: number } | null;
   trackIds: string[];
   scheduleTemplateId: ScheduleTemplateId;
   timeSlots: TimeSlot[];
@@ -227,6 +228,7 @@ export function ScheduleBuilder({
   endDateMode,
   manualEndDate,
   calculatedEndDate,
+  fixedPeriod,
   trackIds,
   scheduleTemplateId,
   timeSlots,
@@ -285,8 +287,6 @@ export function ScheduleBuilder({
   useEffect(() => {
     if (isMichaelTemplate && startDate) {
       const template = getScheduleTemplate('michael');
-      onEndDateModeChange('auto');
-      onManualEndDateChange('');
       setSessionsPerWeek(template.sessionsPerWeek);
       setHoursPerSession(template.hoursPerSession);
       setNewEnd(MICHAEL_DEFAULT_END);
@@ -322,6 +322,8 @@ export function ScheduleBuilder({
   const handleTemplateChange = (id: ScheduleTemplateId) => {
     onScheduleTemplateIdChange(id);
     if (id === 'michael') {
+      onEndDateModeChange('auto');
+      onManualEndDateChange('');
       setSelectedDays([0, 3]);
       setNewStart(DEFAULT_START);
       setNewEnd(MICHAEL_DEFAULT_END);
@@ -376,7 +378,12 @@ export function ScheduleBuilder({
   };
 
   const handleModeChange = (mode: EndDateMode) => {
-    if (isMichaelTemplate) return;
+    if (isMichaelTemplate) {
+      // Michael keeps its days and hours; only how the period ends changes.
+      if (mode === 'manual') return;
+      onEndDateModeChange(mode);
+      return;
+    }
     onEndDateModeChange(mode);
     onTimeSlotsChange([]);
     setDistributionApplied(false);
@@ -431,7 +438,8 @@ export function ScheduleBuilder({
   }
 
   const newSlotHours = getLessonCountForSlot(newStart, newEnd);
-  const showSlotBuilder = endDateMode === 'auto' || distributionApplied;
+  const showSlotBuilder = endDateMode !== 'manual' || distributionApplied;
+  const isFixedPeriod = endDateMode === 'fixed';
 
   return (
     <section className="card">
@@ -466,9 +474,12 @@ export function ScheduleBuilder({
             <li>תרגול — כל מפגש רביעי, ללא שני מפגשי תרגול רצופים</li>
             <li>השלמת מסלול: בניית פרויקטים (עד 5) + הצגת פרויקטים (מפגש 1)</li>
             <li>סיום כל מסלול: מבחן סיום ואחריו חלוקת תעודות</li>
-            {trackIds.length > 1 && (
-              <li>מסלולים לפי סדר — מסלול אחד בכל שבוע, ללא ערבוב וללא התנגשות בתאריכים</li>
-            )}
+            {trackIds.length > 1 &&
+              (isFixedPeriod ? (
+                <li>מסלולים לפי סדר — זמן התקופה מתחלק ביניהם לפי כמות השיעורים בכל מסלול</li>
+              ) : (
+                <li>מסלולים לפי סדר — מסלול אחד בכל שבוע, ללא ערבוב וללא התנגשות בתאריכים</li>
+              ))}
           </ul>
         </div>
       )}
@@ -477,7 +488,13 @@ export function ScheduleBuilder({
         <div className="recommendation-panel recommendation-ok template-michael-panel">
           <strong>תבנית מיכאל פעילה</strong>
           <ul>
-            <li>תאריך סיום מחושב אוטומטית — מינימום שנה שלמה מתאריך ההתחלה</li>
+            {isFixedPeriod ? (
+              <li>
+                תקופה קבועה — כל המסלולים מותאמים לתקופה שבחרת, גם כשמוסיפים מסלול
+              </li>
+            ) : (
+              <li>תאריך סיום מחושב אוטומטית — מינימום שנה שלמה מתאריך ההתחלה</li>
+            )}
             <li>
               2 ימי לימוד בשבוע
               {selectedDays.length === 2
@@ -495,12 +512,20 @@ export function ScheduleBuilder({
                 ' — בחר שעת התחלה למטה'
               )}
             </li>
-            {calculatedEndDate && (
+            {isFixedPeriod && fixedPeriod && (
+              <li>
+                {fixedPeriod.meetings} מפגשים בתקופה · עד {fixedPeriod.maxLessonsPerMeeting} שיעורים
+                במפגש
+                {fixedPeriod.maxLessonsPerMeeting > activeTemplate.hoursPerSession &&
+                  ' (יותר משעות המפגש — לפי התקופה שנקבעה)'}
+              </li>
+            )}
+            {!isFixedPeriod && calculatedEndDate && (
               <li>
                 תאריך סיום משוער: <span dir="ltr">{formatDateHeDisplay(calculatedEndDate)}</span>
               </li>
             )}
-            {startDate && !calculatedEndDate && (
+            {!isFixedPeriod && startDate && !calculatedEndDate && (
               <li>
                 תאריך סיום מינימלי:{' '}
                 <span dir="ltr">{formatDateHeDisplay(getTemplateEndDate(startDate, activeTemplate.periodYears))}</span>
@@ -549,7 +574,6 @@ export function ScheduleBuilder({
         </div>
       )}
 
-      {!isMichaelTemplate && (
       <div className="end-date-mode">
         <h3>תאריך סיום</h3>
         <div className="mode-toggle">
@@ -562,22 +586,40 @@ export function ScheduleBuilder({
               onChange={() => handleModeChange('auto')}
             />
             <span className="mode-title">אוטומטי</span>
-            <span className="mode-desc">המערכת תחשב תאריך סיום לפי כמות השיעורים</span>
+            <span className="mode-desc">
+              {isMichaelTemplate
+                ? 'לפי כמות השיעורים, מינימום שנה'
+                : 'המערכת תחשב תאריך סיום לפי כמות השיעורים'}
+            </span>
           </label>
-          <label className={`mode-option ${endDateMode === 'manual' ? 'active' : ''}`}>
+          {!isMichaelTemplate && (
+            <label className={`mode-option ${endDateMode === 'manual' ? 'active' : ''}`}>
+              <input
+                type="radio"
+                name="endDateMode"
+                value="manual"
+                checked={endDateMode === 'manual'}
+                onChange={() => handleModeChange('manual')}
+              />
+              <span className="mode-title">ידני</span>
+              <span className="mode-desc">בחר תאריך סיום וחלוקת לימודים מומלצת</span>
+            </label>
+          )}
+          <label className={`mode-option ${endDateMode === 'fixed' ? 'active' : ''}`}>
             <input
               type="radio"
               name="endDateMode"
-              value="manual"
-              checked={endDateMode === 'manual'}
-              onChange={() => handleModeChange('manual')}
+              value="fixed"
+              checked={endDateMode === 'fixed'}
+              onChange={() => handleModeChange('fixed')}
             />
-            <span className="mode-title">ידני</span>
-            <span className="mode-desc">בחר תאריך סיום וחלוקת לימודים מומלצת</span>
+            <span className="mode-title">תקופה קבועה</span>
+            <span className="mode-desc">
+              מתאריך עד תאריך — כל המסלולים נכנסים לתקופה, גם כשמוסיפים מסלולים
+            </span>
           </label>
         </div>
       </div>
-      )}
 
       <div className="form-grid">
         <label>
@@ -589,19 +631,7 @@ export function ScheduleBuilder({
             dir="ltr"
           />
         </label>
-        {isMichaelTemplate ? (
-          <label>
-            תאריך סיום (מחושב)
-            <input
-              type="text"
-              value={formatDateHeDisplay(calculatedEndDate)}
-              readOnly
-              className="readonly-field"
-              dir="ltr"
-              placeholder="יוצג לאחר בחירת מסלולים וימי לימוד"
-            />
-          </label>
-        ) : endDateMode === 'auto' ? (
+        {endDateMode === 'auto' ? (
           <label>
             תאריך סיום (מחושב)
             <input
