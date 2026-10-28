@@ -10,9 +10,40 @@ import {
 import { getScheduleFitStatus } from './utils/scheduleRecommendations';
 import { getTotalLessonCount } from './data/tracks';
 import { getScheduleTemplate } from './utils/scheduleTemplates';
+import {
+  DEFAULT_HOLIDAY_POLICY,
+  HOLIDAY_GROUPS,
+  type HolidayPolicy,
+} from './utils/holidays';
 import type { EndDateMode, ScheduleTemplateId, TimeSlot } from './types';
 import logoUrl from './assets/logo.png';
 import './App.css';
+
+const HOLIDAY_POLICY_KEY = 'scheduleSuccess.holidayPolicy.v1';
+
+// The college's days-off choices are kept in this browser, so they do not
+// have to be set again for every student.
+function loadHolidayPolicy(): HolidayPolicy {
+  try {
+    const saved = JSON.parse(localStorage.getItem(HOLIDAY_POLICY_KEY) ?? 'null');
+    if (!saved) return DEFAULT_HOLIDAY_POLICY;
+    const off = { ...DEFAULT_HOLIDAY_POLICY.off };
+    for (const group of HOLIDAY_GROUPS) {
+      if (typeof saved.off?.[group.id] === 'boolean') off[group.id] = saved.off[group.id];
+    }
+    const extraDays = Array.isArray(saved.extraDays)
+      ? saved.extraDays.filter((d: unknown) => typeof (d as { date?: unknown })?.date === 'string')
+      : [];
+    return { off, extraDays };
+  } catch {
+    return DEFAULT_HOLIDAY_POLICY;
+  }
+}
+
+function formatSkippedDate(date: string): string {
+  const [y, m, d] = date.split('-');
+  return `${d}/${m}/${y}`;
+}
 
 function App() {
   const [fullName, setFullName] = useState('');
@@ -26,6 +57,15 @@ function App() {
   const [scheduleTemplateId, setScheduleTemplateId] = useState<ScheduleTemplateId>('custom');
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [showDocument, setShowDocument] = useState(false);
+  const [holidayPolicy, setHolidayPolicy] = useState<HolidayPolicy>(loadHolidayPolicy);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(HOLIDAY_POLICY_KEY, JSON.stringify(holidayPolicy));
+    } catch {
+      // storage unavailable — the choices still apply for this visit
+    }
+  }, [holidayPolicy]);
 
   const scheduleResult = useMemo((): ScheduleResult => {
     if (!startDate || !trackIds.length || !timeSlots.length) {
@@ -48,8 +88,9 @@ function App() {
       manualEndDate: endDateMode === 'auto' ? undefined : manualEndDate,
       minimumPeriodYears: getScheduleTemplate(scheduleTemplateId).periodYears,
       structuredTrackFlow: getScheduleTemplate(scheduleTemplateId).structuredTrackFlow,
+      holidayPolicy,
     });
-  }, [trackIds, startDate, timeSlots, endDateMode, manualEndDate, scheduleTemplateId]);
+  }, [trackIds, startDate, timeSlots, endDateMode, manualEndDate, scheduleTemplateId, holidayPolicy]);
 
   const {
     sessions,
@@ -58,6 +99,12 @@ function App() {
     assignedLessons,
     fitsCompletely,
   } = scheduleResult;
+
+  const uniqueSkippedDays = useMemo(() => {
+    const byDate = new Map<string, string>();
+    for (const day of skippedDays) byDate.set(day.date, day.reason);
+    return [...byDate].sort(([a], [b]) => a.localeCompare(b)).map(([date, reason]) => ({ date, reason }));
+  }, [skippedDays]);
 
   const scheduledLessons = useMemo(
     () => countScheduledLessons(sessions),
@@ -170,6 +217,8 @@ function App() {
           onManualEndDateChange={setManualEndDate}
           onScheduleTemplateIdChange={setScheduleTemplateId}
           onTimeSlotsChange={setTimeSlots}
+          holidayPolicy={holidayPolicy}
+          onHolidayPolicyChange={setHolidayPolicy}
         />
 
         {hasScheduleInput && sessions.length > 0 && (
@@ -189,10 +238,19 @@ function App() {
                 <span className="summary-warning"> (לא הושלם)</span>
               )}
             </span>
-            {skippedDays.length > 0 && (
-              <span className="skipped-badge">
-                {skippedDays.length} ימים דולגו (חגים/שבת)
-              </span>
+            {uniqueSkippedDays.length > 0 && (
+              <details className="skipped-days">
+                <summary className="skipped-badge">
+                  {uniqueSkippedDays.length} ימי לימוד דולגו (חגים) — הצג
+                </summary>
+                <ul>
+                  {uniqueSkippedDays.map((day) => (
+                    <li key={day.date}>
+                      <span dir="ltr">{formatSkippedDate(day.date)}</span> — {day.reason}
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
           </div>
         )}

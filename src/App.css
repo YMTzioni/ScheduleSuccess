@@ -1281,3 +1281,81 @@ textarea:focus {
     display: none !important;
   }
 }
+
+.holiday-settings {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fafbfc;
+}
+
+.holiday-settings summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.holiday-settings h4 {
+  margin: 1rem 0 0.25rem;
+  font-size: 0.95rem;
+}
+
+.holiday-settings-hint {
+  margin: 0.5rem 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.holiday-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.35rem 1rem;
+}
+
+.holiday-group {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.holiday-extra-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.holiday-extra-form input[type='text'] {
+  flex: 1;
+  min-width: 160px;
+}
+
+.holiday-extra-list {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.holiday-extra-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+}
+
+.skipped-days summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.skipped-days ul {
+  margin: 0.5rem 0 0;
+  padding-inline-start: 1.2rem;
+  max-height: 220px;
+  overflow-y: auto;
+  font-size: 0.85rem;
+}

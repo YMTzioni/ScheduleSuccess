@@ -12,6 +12,7 @@ import {
 } from '../utils/distributionPlanner';
 import { getLessonCountForSlot } from '../utils/scheduleGenerator';
 import type { ScheduleFitStatus } from '../utils/scheduleRecommendations';
+import { HOLIDAY_GROUPS, type HolidayPolicy } from '../utils/holidays';
 import {
   getScheduleTemplate,
   getTemplateEndDate,
@@ -210,6 +211,8 @@ interface ScheduleBuilderProps {
   onManualEndDateChange: (v: string) => void;
   onScheduleTemplateIdChange: (id: ScheduleTemplateId) => void;
   onTimeSlotsChange: (slots: TimeSlot[]) => void;
+  holidayPolicy: HolidayPolicy;
+  onHolidayPolicyChange: (policy: HolidayPolicy) => void;
 }
 
 const DEFAULT_START = '09:00';
@@ -238,6 +241,8 @@ export function ScheduleBuilder({
   onManualEndDateChange,
   onScheduleTemplateIdChange,
   onTimeSlotsChange,
+  holidayPolicy,
+  onHolidayPolicyChange,
 }: ScheduleBuilderProps) {
   const activeTemplate = getScheduleTemplate(scheduleTemplateId);
   const isMichaelTemplate = scheduleTemplateId === 'michael';
@@ -260,8 +265,8 @@ export function ScheduleBuilder({
 
   const distributionOptions = useMemo(() => {
     if (!periodStats || !startDate || !manualEndDate) return [];
-    return getDistributionOptions(trackIds, startDate, manualEndDate);
-  }, [periodStats, trackIds, startDate, manualEndDate]);
+    return getDistributionOptions(trackIds, startDate, manualEndDate, holidayPolicy);
+  }, [periodStats, trackIds, startDate, manualEndDate, holidayPolicy]);
 
   const distributionSummary = useMemo(() => {
     if (!periodStats || !distributionOptions.length) return null;
@@ -657,6 +662,8 @@ export function ScheduleBuilder({
         )}
       </div>
 
+      <HolidaySettings policy={holidayPolicy} onChange={onHolidayPolicyChange} />
+
       {showManualPlanner && distributionSummary && (
         <div className={`recommendation-panel recommendation-${distributionSummary.status}`}>
           <strong>{distributionSummary.title}</strong>
@@ -890,5 +897,101 @@ export function ScheduleBuilder({
               : 'במצב ידני: קודם בחר תאריכים וחלוקה, ואז המערכת תבנה את ימי הלימוד עבורך.'}
       </p>
     </section>
+  );
+}
+
+function HolidaySettings({
+  policy,
+  onChange,
+}: {
+  policy: HolidayPolicy;
+  onChange: (policy: HolidayPolicy) => void;
+}) {
+  const [extraDate, setExtraDate] = useState('');
+  const [extraLabel, setExtraLabel] = useState('');
+  const offCount = HOLIDAY_GROUPS.filter((g) => policy.off[g.id]).length;
+
+  const toggle = (id: (typeof HOLIDAY_GROUPS)[number]['id']) =>
+    onChange({ ...policy, off: { ...policy.off, [id]: !policy.off[id] } });
+
+  const addExtra = () => {
+    if (!extraDate || policy.extraDays.some((d) => d.date === extraDate)) return;
+    onChange({
+      ...policy,
+      extraDays: [...policy.extraDays, { date: extraDate, label: extraLabel.trim() }].sort((a, b) =>
+        a.date.localeCompare(b.date),
+      ),
+    });
+    setExtraDate('');
+    setExtraLabel('');
+  };
+
+  const removeExtra = (date: string) =>
+    onChange({ ...policy, extraDays: policy.extraDays.filter((d) => d.date !== date) });
+
+  return (
+    <details className="holiday-settings">
+      <summary>
+        ימים ללא לימודים — {offCount} סוגי חגים
+        {policy.extraDays.length > 0 && ` + ${policy.extraDays.length} ימים נוספים`}
+      </summary>
+      <p className="holiday-settings-hint">
+        לפי לוח השנה העברי בישראל. מסומן = אין לימודים באותו יום. ההגדרה נשמרת בדפדפן הזה.
+      </p>
+      <div className="holiday-groups">
+        {HOLIDAY_GROUPS.map((group) => (
+          <label key={group.id} className="holiday-group">
+            <input
+              type="checkbox"
+              checked={policy.off[group.id]}
+              onChange={() => toggle(group.id)}
+            />
+            {group.label}
+          </label>
+        ))}
+      </div>
+
+      <h4>ימים נוספים ללא לימודים</h4>
+      <p className="holiday-settings-hint">
+        למשל יום בחירות או חופשת מכללה — ימים שלא מופיעים בלוח השנה.
+      </p>
+      <div className="holiday-extra-form">
+        <input
+          type="date"
+          value={extraDate}
+          onChange={(e) => setExtraDate(e.target.value)}
+          dir="ltr"
+          aria-label="תאריך"
+        />
+        <input
+          type="text"
+          value={extraLabel}
+          onChange={(e) => setExtraLabel(e.target.value)}
+          placeholder="סיבה (לא חובה)"
+          aria-label="סיבה"
+        />
+        <button type="button" className="btn btn-secondary" onClick={addExtra} disabled={!extraDate}>
+          + הוסף
+        </button>
+      </div>
+      {policy.extraDays.length > 0 && (
+        <ul className="holiday-extra-list">
+          {policy.extraDays.map((day) => (
+            <li key={day.date}>
+              <span dir="ltr">{day.date.split('-').reverse().join('/')}</span>
+              {day.label && ` — ${day.label}`}
+              <button
+                type="button"
+                className="btn-remove"
+                onClick={() => removeExtra(day.date)}
+                aria-label="הסר"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </details>
   );
 }

@@ -1,7 +1,12 @@
 import { addDays, addYears, format, isAfter, parseISO } from 'date-fns';
 import type { EndDateMode, LessonItem, ScheduledSession, TimeSlot } from '../types';
 import { TRACKS, getTotalLessonCount } from '../data/tracks';
-import { getIsraeliHolidays, isStudyDay } from './holidays';
+import {
+  DEFAULT_HOLIDAY_POLICY,
+  getIsraeliHolidays,
+  isStudyDay,
+  type HolidayPolicy,
+} from './holidays';
 
 export const FINAL_EXAM_TITLE = 'מבחן סיום';
 export const CERTIFICATE_TITLE = 'חלוקת תעודות';
@@ -143,6 +148,7 @@ function scheduleMichaelTrackClosing(
   holidayMap: ReturnType<typeof getIsraeliHolidays>,
   isLastTrack: boolean,
   minEndDate: Date | null,
+  hardEnd: Date | null,
 ): string | null {
   const teachingEndDate = getTrackTeachingEndDate(sessions, trackName);
   if (!teachingEndDate) return null;
@@ -161,13 +167,17 @@ function scheduleMichaelTrackClosing(
   const wantsPresentation = MAX_PROJECT_PRESENTATION_SESSIONS > 0;
   const tailCount = milestoneCount + (wantsPresentation ? 1 : 0);
 
+  // A chosen end date is a wall: closing meetings that do not fit before it
+  // are left out (the schedule then reports it is incomplete), never placed
+  // after it.
   let periodEnd = getMichaelClosingPeriodEnd(teachingEndDate, isLastTrack, minEndDate);
+  if (hardEnd && isAfter(periodEnd, hardEnd)) periodEnd = hardEnd;
   let allMeetings = collectValidMeetingSlots(periodStart, periodEnd, timeSlots, holidayMap);
   let forward = allMeetings.filter(
     (slot) => slot.date > teachingEndDate && !usedDates.has(slot.date),
   );
 
-  if (forward.length < tailCount) {
+  if (forward.length < tailCount && !hardEnd) {
     periodEnd = addDays(periodEnd, 365);
     allMeetings = collectValidMeetingSlots(periodStart, periodEnd, timeSlots, holidayMap);
     forward = allMeetings.filter(
@@ -289,6 +299,7 @@ export interface BuildScheduleParams {
   manualEndDate?: string;
   minimumPeriodYears?: number;
   structuredTrackFlow?: boolean;
+  holidayPolicy?: HolidayPolicy;
 }
 
 export interface ScheduleResult {
@@ -348,6 +359,25 @@ function collectValidMeetingSlots(
   }
 
   return meetings;
+}
+
+// Every day in the period that has a chosen time slot but no lessons because
+// of a holiday or a day off — the whole period, closing meetings included.
+function listSkippedStudyDays(
+  startDate: string,
+  endDate: string,
+  timeSlots: TimeSlot[],
+  holidayMap: ReturnType<typeof getIsraeliHolidays>,
+): { date: string; reason: string }[] {
+  const skipped: { date: string; reason: string }[] = [];
+  if (!startDate || !endDate) return skipped;
+  const end = parseISO(endDate);
+  for (let day = parseISO(startDate); !isAfter(day, end); day = addDays(day, 1)) {
+    if (!timeSlots.some((s) => s.dayOfWeek === day.getDay())) continue;
+    const { allowed, reason } = isStudyDay(day, holidayMap);
+    if (!allowed && reason) skipped.push({ date: format(day, 'yyyy-MM-dd'), reason });
+  }
+  return skipped;
 }
 
 function sortScheduledSessions(sessions: ScheduledSession[]): ScheduledSession[] {
@@ -415,6 +445,7 @@ function finalizeMichaelTrackSegment(
   holidayMap: ReturnType<typeof getIsraeliHolidays>,
   isLastTrack: boolean,
   minEndDate: Date | null,
+  hardEnd: Date | null,
 ): string | null {
   return scheduleMichaelTrackClosing(
     sessions,
@@ -425,6 +456,7 @@ function finalizeMichaelTrackSegment(
     holidayMap,
     isLastTrack,
     minEndDate,
+    hardEnd,
   );
 }
 
@@ -438,6 +470,7 @@ export function countPeriodCapacity(
   startDate: string,
   endDate: string,
   timeSlots: TimeSlot[],
+  holidayPolicy: HolidayPolicy = DEFAULT_HOLIDAY_POLICY,
 ): { lessonCapacity: number; meetingCount: number } {
   if (!startDate || !endDate || !timeSlots.length) {
     return { lessonCapacity: 0, meetingCount: 0 };
@@ -449,7 +482,7 @@ export function countPeriodCapacity(
     return { lessonCapacity: 0, meetingCount: 0 };
   }
 
-  const holidayMap = getIsraeliHolidays(startDate, endDate);
+  const holidayMap = getIsraeliHolidays(startDate, endDate, holidayPolicy);
   let lessonCapacity = 0;
   let meetingCount = 0;
   let current = start;
@@ -481,6 +514,7 @@ export function buildSchedule({
   manualEndDate,
   minimumPeriodYears = 0,
   structuredTrackFlow = true,
+  holidayPolicy = DEFAULT_HOLIDAY_POLICY,
 }: BuildScheduleParams): ScheduleResult {
   const empty: ScheduleResult = {
     sessions: [],
@@ -513,7 +547,7 @@ export function buildSchedule({
 
   if (endDateMode === 'fixed') {
     if (!manualEndDate || manualEndDate < startDate) return { ...empty, totalLessons };
-    return buildFixedPeriodSchedule(trackIds, startDate, manualEndDate, timeSlots);
+    return buildFixedPeriodSchedule(trackIds, startDate, manualEndDate, timeSlots, holidayPolicy);
   }
 
   const isManual = endDateMode === 'manual';
@@ -541,9 +575,9 @@ export function buildSchedule({
         'yyyy-MM-dd',
       );
 
-  const holidayMap = getIsraeliHolidays(startDate, searchEnd);
+  const holidayMap = getIsraeliHolidays(startDate, searchEnd, holidayPolicy);
   const { lessonCapacity: periodCapacity, meetingCount } = isManual
-    ? countPeriodCapacity(startDate, manualEndDate!, timeSlots)
+    ? countPeriodCapacity(startDate, manualEndDate!, timeSlots, holidayPolicy)
     : { lessonCapacity: 0, meetingCount: 0 };
 
   const sessions: ScheduledSession[] = [];
@@ -700,6 +734,7 @@ export function buildSchedule({
           holidayMap,
           isLastSegment,
           closingMinEndDate,
+          manualEnd,
         );
         if (certDate) {
           blockUntilAfterWeek = getWeekKey(parseISO(certDate));
@@ -843,6 +878,7 @@ export function buildSchedule({
           holidayMap,
           true,
           closingMinEndDate,
+          manualEnd,
         );
       }
     }
@@ -867,7 +903,7 @@ export function buildSchedule({
   return {
     sessions: finalSessions,
     endDate,
-    skippedDays,
+    skippedDays: listSkippedStudyDays(startDate, endDate, timeSlots, holidayMap),
     totalLessons,
     assignedLessons: queueIndex,
     fitsCompletely: queueIndex >= totalScheduleItems,
@@ -1000,18 +1036,14 @@ function buildFixedPeriodSchedule(
   startDate: string,
   endDate: string,
   timeSlots: TimeSlot[],
+  holidayPolicy: HolidayPolicy,
 ): ScheduleResult {
-  const holidayMap = getIsraeliHolidays(startDate, endDate);
+  const holidayMap = getIsraeliHolidays(startDate, endDate, holidayPolicy);
   const start = parseISO(startDate);
   const end = parseISO(endDate);
   const meetings = collectValidMeetingSlots(start, end, timeSlots, holidayMap);
 
-  const skippedDays: { date: string; reason: string }[] = [];
-  for (let day = start; !isAfter(day, end); day = addDays(day, 1)) {
-    if (!timeSlots.some((s) => s.dayOfWeek === day.getDay())) continue;
-    const { allowed, reason } = isStudyDay(day, holidayMap);
-    if (!allowed && reason) skippedDays.push({ date: format(day, 'yyyy-MM-dd'), reason });
-  }
+  const skippedDays = listSkippedStudyDays(startDate, endDate, timeSlots, holidayMap);
 
   const tracks = trackIds
     .map((id) => TRACKS.find((t) => t.id === id))

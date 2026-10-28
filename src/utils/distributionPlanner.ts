@@ -2,6 +2,7 @@ import { differenceInCalendarDays, parseISO } from 'date-fns';
 import type { TimeSlot } from '../types';
 import { getTotalLessonCount } from '../data/tracks';
 import { countPeriodCapacity } from './scheduleGenerator';
+import { DEFAULT_HOLIDAY_POLICY, type HolidayPolicy } from './holidays';
 
 export interface PeriodStats {
   totalLessons: number;
@@ -69,19 +70,21 @@ function estimateCapacity(
   endDate: string,
   hoursPerSession: number,
   days: number[],
+  holidayPolicy: HolidayPolicy,
 ): number {
   const slots: TimeSlot[] = days.map((dayOfWeek) => ({
     dayOfWeek,
     startTime: '09:00',
     endTime: addHoursToTime('09:00', hoursPerSession),
   }));
-  return countPeriodCapacity(startDate, endDate, slots).lessonCapacity;
+  return countPeriodCapacity(startDate, endDate, slots, holidayPolicy).lessonCapacity;
 }
 
 export function getDistributionOptions(
   trackIds: string[],
   startDate: string,
   endDate: string,
+  holidayPolicy: HolidayPolicy = DEFAULT_HOLIDAY_POLICY,
 ): DistributionOption[] {
   const stats = getPeriodStats(trackIds, startDate, endDate);
   if (!stats) return [];
@@ -99,6 +102,7 @@ export function getDistributionOptions(
         endDate,
         hours,
         recommendedDays,
+        holidayPolicy,
       );
 
       options.push({
